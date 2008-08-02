@@ -35,6 +35,8 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+#define _trace() NSLog(@"_trace(%u)", __LINE__);
+
 #include <objc/runtime.h>
 #include <objc/message.h>
 
@@ -43,10 +45,14 @@
 #import <UIKit/UIColor.h>
 #import <UIKit/UIImage.h>
 #import <UIKit/UIImageView.h>
+
+#import <UIKit/UIView-Geometry.h>
 #import <UIKit/UIView-Hierarchy.h>
+#import <UIKit/UIView-Rendering.h>
 
 #import <SpringBoard/SBApplication.h>
 #import <SpringBoard/SBAppWindow.h>
+#import <SpringBoard/SBButtonBar.h>
 #import <SpringBoard/SBContentLayer.h>
 #import <SpringBoard/SBUIController.h>
 
@@ -93,33 +99,44 @@ void WBRename(const char *classname, const char *oldname, IMP newimp) {
     free(methods);
 }
 
-static NSString *Dylib_ = @"/System/Library/PrivateFrameworks/WinterBoard.framework/WinterBoard.dylib";
+static NSString *Dylib_ = @"/Applications/WinterBoard.app/WinterBoard.dylib";
 /* }}} */
 
 @protocol WinterBoard
 - (NSString *) wb_pathForIcon;
 - (NSString *) wb_pathForResource:(NSString *)resource ofType:(NSString *)type;
 - (id) wb_initWithSize:(CGSize)size;
+- (id) wb_initWithFrame:(CGRect)frame;
+- (void) wb_setFrame:(CGRect)frame;
 - (void) wb_setBackgroundColor:(id)color;
+- (void) wb_setAlpha:(float)value;
+- (void) wb_addSubview:(UIView *)addSubview;
 @end
 
-NSString *Themes_ = @"/System/Library/Themes";
-NSString *theme_ = @"Litho";
+NSString *Themes_ = @"/Library/Themes";
+NSString *theme_;
+NSString *Wallpaper_;
 
 NSString *SBApplication$pathForIcon(SBApplication<WinterBoard> *self, SEL sel) {
-    NSFileManager *manager([NSFileManager defaultManager]);
-    NSString *path;
-    path = [NSString stringWithFormat:@"%@/%@/Icons/%@.png", Themes_, theme_, [self displayName]];
-    if ([manager fileExistsAtPath:path])
-        return path;
-    path = [NSString stringWithFormat:@"%@/%@/Icons/%@.png", Themes_, theme_, [self bundleIdentifier]];
-    if ([manager fileExistsAtPath:path])
-        return path;
+    if (theme_ != nil) {
+        NSFileManager *manager([NSFileManager defaultManager]);
+
+        #define testForIcon(Name) \
+            if (NSString *name = Name) { \
+                NSString *path = [NSString stringWithFormat:@"%@/%@/Icons/%@.png", Themes_, theme_, name]; \
+                if ([manager fileExistsAtPath:path]) \
+                    return path; \
+            }
+
+        testForIcon([self displayName]);
+        testForIcon([self bundleIdentifier]);
+    }
+
     return [self wb_pathForIcon];
 }
 
 NSString *NSBundle$pathForResource$ofType$(NSBundle<WinterBoard> *self, SEL sel, NSString *resource, NSString *type) {
-    if ([resource isEqualToString:@"SBDockBG"] && [type isEqualToString:@"png"]) {
+    if (theme_ != nil && [resource isEqualToString:@"SBDockBG"] && [type isEqualToString:@"png"]) {
         NSFileManager *manager([NSFileManager defaultManager]);
         NSString *path = [NSString stringWithFormat:@"%@/%@/Dock.png", Themes_, theme_];
         if ([manager fileExistsAtPath:path])
@@ -129,25 +146,29 @@ NSString *NSBundle$pathForResource$ofType$(NSBundle<WinterBoard> *self, SEL sel,
     return [self wb_pathForResource:resource ofType:type];
 }
 
-void SBAppWindow$setBackgroundColor$(SBAppWindow<WinterBoard> *self, SEL sel, id color) {
-    [self wb_setBackgroundColor:[UIColor clearColor]];
+void SBAppWindow$setBackgroundColor$(SBAppWindow<WinterBoard> *self, SEL sel, UIColor *color) {
+    if (Wallpaper_ != nil)
+        return [self wb_setBackgroundColor:[UIColor clearColor]];
+    return [self wb_setBackgroundColor:color];
 }
+
+/*id SBButtonBar$initWithFrame$(SBButtonBar<WinterBoard> *self, SEL sel, CGRect frame) {
+    self = [self wb_initWithFrame:frame];
+    if (self == nil)
+        return nil;
+    if (Wallpaper_ != nil)
+        [self setBackgroundColor:[UIColor clearColor]];
+    return self;
+}*/
 
 id SBContentLayer$initWithSize$(SBContentLayer<WinterBoard> *self, SEL sel, CGSize size) {
     self = [self wb_initWithSize:size];
     if (self == nil)
         return nil;
 
-    NSFileManager *manager([NSFileManager defaultManager]);
-    NSString *path = [NSString stringWithFormat:@"%@/%@/Wallpaper.png", Themes_, theme_];
-    if ([manager fileExistsAtPath:path])
-        if (UIImage *image = [[UIImage alloc] initWithContentsOfFile:path]) {
-            /*window_ = [[UIWindow alloc] initWithContentRect:CGRectMake(0, 0, 320, 480)];
-            [window_ setHidden:NO];*/
-            UIImageView *view = [[[UIImageView alloc] initWithImage:image] autorelease];
-            //[view setFrame:CGRectMake(0, -10, 320, 480)];
-            [self addSubview:view];
-        }
+    if (Wallpaper_ != nil)
+        if (UIImage *image = [[UIImage alloc] initWithContentsOfFile:Wallpaper_])
+            [self addSubview:[[[UIImageView alloc] initWithImage:image] autorelease]];
 
     return self;
 }
@@ -183,6 +204,16 @@ extern "C" void WBInitialize() {
     WBRename("NSBundle", "pathForResource:ofType:", (IMP) &NSBundle$pathForResource$ofType$);
     WBRename("SBAppWindow", "setBackgroundColor:", (IMP) &SBAppWindow$setBackgroundColor$);
     WBRename("SBContentLayer", "initWithSize:", (IMP) &SBContentLayer$initWithSize$);
+
+    if (NSDictionary *settings = [[NSDictionary alloc] initWithContentsOfFile:[NSString stringWithFormat:@"%@/Library/Preferences/com.saurik.WinterBoard.plist", NSHomeDirectory()]]) {
+        [settings autorelease];
+        theme_ = [[settings objectForKey:@"Theme"] retain];
+
+        NSFileManager *manager([NSFileManager defaultManager]);
+        NSString *path = [NSString stringWithFormat:@"%@/%@/Wallpaper.png", Themes_, theme_];
+        if ([manager fileExistsAtPath:path])
+            Wallpaper_ = [path retain];
+    }
 
     [pool release];
 }

@@ -1,0 +1,7 @@
+#!/bin/bash
+
+if [[ $1 == install ]]; then
+    /usr/libexec/cydia/move.sh /Library/Themes
+fi
+
+exit 0

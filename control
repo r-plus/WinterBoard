@@ -1,0 +1,11 @@
+Package: winterboard
+Priority: optional
+Section: Themes
+Maintainer: Jay Freeman (saurik) <saurik@saurik.com>
+Architecture: iphoneos-arm
+Version: 0.9.2498-1
+Description: open-source SummerBoard replacement
+ This tool lets you apply SummerBoard themes. Themes are taken from /Library/Themes. Right now the tool is /very/ simplistic: I spent a single night coding it so that we would have some stronger theme support on iPhone 2.x. After you install or uninstall this package you will have to reboot your phone to it to take effect. More work will be done on this package in the very near future to make it actually have an interface ;P. (Also, the wallpaper is cut off at the bottom under the dock. I'm working on that still.)
+Name: WinterBoard
+Author: Jay Freeman (saurik) <saurik@saurik.com>
+Homepage: http://cydia.saurik.com/winterboard.html

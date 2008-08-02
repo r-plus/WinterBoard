@@ -1,0 +1,6 @@
+#!/bin/sh
+
+if [[ $1 == remove ]]; then
+    /Applications/WinterBoard.app/pledit /System/Library/LaunchDaemons/com.apple.SpringBoard.plist \
+        -r /Applications/WinterBoard.app/WinterBoard.dylib
+fi
