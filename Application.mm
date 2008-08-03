@@ -47,7 +47,7 @@
 > {
     UIWindow *window_;
     UITableView *themesTable_;
-    NSArray *themesArray_;
+    NSMutableArray *themesArray_;
 }
 
 @end
@@ -90,8 +90,11 @@
     window_ = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].applicationFrame];
     [window_ makeKeyAndVisible];
 
+    themesArray_ = [[NSMutableArray arrayWithCapacity:32] retain];
     NSFileManager *manager = [NSFileManager defaultManager];
-    themesArray_ = [[manager contentsOfDirectoryAtPath:@"/Library/Themes" error:nil] retain];
+
+    [themesArray_ addObjectsFromArray:[manager contentsOfDirectoryAtPath:@"/Library/Themes" error:NULL]];
+    [themesArray_ addObjectsFromArray:[manager contentsOfDirectoryAtPath:[NSString stringWithFormat:@"%@/Library/SummerBoard/Themes", NSHomeDirectory()] error:NULL]];
 
     themesTable_ = [[UITableView alloc] initWithFrame:window_.bounds];
     [window_ addSubview:themesTable_];

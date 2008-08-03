@@ -19,10 +19,10 @@ package:
 	rm -rf winterboard
 	mkdir -p winterboard/DEBIAN
 	mkdir -p winterboard/Applications/WinterBoard.app
-	mkdir -p winterboard/Library/Themes/com.saurik.WinterBoard.Nature
+	mkdir -p winterboard/Library/Themes
+	cp -a Nature winterboard/Library/Themes/com.saurik.WinterBoard.Nature
 	cp -a control preinst postinst prerm winterboard/DEBIAN
 	cp -a Test.sh WinterBoard.dylib WinterBoard Info.plist ../pledit/pledit winterboard/Applications/WinterBoard.app
-	cp -a Wallpaper.png Dock.png winterboard/Library/Themes/com.saurik.WinterBoard.Nature
-	dpkg-deb -b winterboard winterboard_0.9.2498-1_iphoneos-arm.deb
+	dpkg-deb -b winterboard winterboard_0.9.2499-2_iphoneos-arm.deb
 
 .PHONY: all clean package
