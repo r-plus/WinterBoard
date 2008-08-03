@@ -23,6 +23,6 @@ package:
 	cp -a Nature winterboard/Library/Themes/com.saurik.WinterBoard.Nature
 	cp -a control preinst postinst prerm winterboard/DEBIAN
 	cp -a Test.sh icon.png WinterBoard.dylib WinterBoard Info.plist ../pledit/pledit winterboard/Applications/WinterBoard.app
-	dpkg-deb -b winterboard winterboard_0.9.2500-1_iphoneos-arm.deb
+	dpkg-deb -b winterboard winterboard_0.9.2501-2_iphoneos-arm.deb
 
 .PHONY: all clean package

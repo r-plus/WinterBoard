@@ -62,6 +62,8 @@ extern "C" {
 #import <SpringBoard/SBAppWindow.h>
 #import <SpringBoard/SBButtonBar.h>
 #import <SpringBoard/SBContentLayer.h>
+#import <SpringBoard/SBStatusBarContentsView.h>
+#import <SpringBoard/SBStatusBarTimeView.h>
 #import <SpringBoard/SBUIController.h>
 
 #import <CoreGraphics/CGGeometry.h>
@@ -131,6 +133,8 @@ void WBRename(const char *classname, const char *oldname, IMP newimp) {
 @protocol WinterBoard
 - (NSString *) wb_pathForIcon;
 - (NSString *) wb_pathForResource:(NSString *)resource ofType:(NSString *)type;
+- (id) wb_init;
+- (id) wb_layer;
 - (id) wb_initWithSize:(CGSize)size;
 - (id) wb_initWithFrame:(CGRect)frame;
 - (id) wb_initWithCoder:(NSCoder *)coder;
@@ -139,6 +143,8 @@ void WBRename(const char *classname, const char *oldname, IMP newimp) {
 - (void) wb_setAlpha:(float)value;
 - (void) wb_setBarStyle:(int)style;
 - (id) wb_initWithFrame:(CGRect)frame withBarStyle:(int)style withTintColor:(UIColor *)color;
+- (void) wb_setOpaque:(BOOL)opaque;
+- (void) wb_didMoveToSuperview;
 @end
 
 NSMutableDictionary **ImageMap_;
@@ -197,11 +203,24 @@ NSString *NSBundle$pathForResource$ofType$(NSBundle<WinterBoard> *self, SEL sel,
     return [self wb_pathForResource:resource ofType:type];
 }
 
-void SBAppWindow$setBackgroundColor$(SBAppWindow<WinterBoard> *self, SEL sel, UIColor *color) {
+void $setBackgroundColor$(id<WinterBoard> self, SEL sel, UIColor *color) {
     if (Wallpaper_ != nil)
         return [self wb_setBackgroundColor:[UIColor clearColor]];
     return [self wb_setBackgroundColor:color];
 }
+
+/*id SBStatusBarContentsView$initWithFrame$(SBStatusBarContentsView<WinterBoard> *self, SEL sel, CGRect frame) {
+    self = [self wb_initWithFrame:frame];
+    if (self == nil)
+        return nil;
+
+    NSString *path = [NSString stringWithFormat:@"%@/StatusBar.png", theme_];
+    if ([Manager_ fileExistsAtPath:path])
+        [self addSubview:[[[UIImageView alloc] initWithImage:[UIImage imageWithContentsOfFile:path]] autorelease]];
+    //[self setBackgroundColor:[UIColor clearColor]];
+
+    return self;
+}*/
 
 bool UINavigationBar$setBarStyle$_(SBAppWindow<WinterBoard> *self) {
     if (Info_ != nil) {
@@ -253,23 +272,21 @@ void UINavigationBar$setBarStyle$(SBAppWindow<WinterBoard> *self, SEL sel, int s
     return [self wb_setBarStyle:style];
 }
 
-/*id SBButtonBar$initWithFrame$(SBButtonBar<WinterBoard> *self, SEL sel, CGRect frame) {
-    self = [self wb_initWithFrame:frame];
-    if (self == nil)
-        return nil;
-    if (Wallpaper_ != nil)
-        [self setBackgroundColor:[UIColor clearColor]];
-    return self;
-}*/
+void $didMoveToSuperview(SBButtonBar<WinterBoard> *self, SEL sel) {
+    [[self superview] setBackgroundColor:[UIColor clearColor]];
+    [self wb_didMoveToSuperview];
+}
 
 id SBContentLayer$initWithSize$(SBContentLayer<WinterBoard> *self, SEL sel, CGSize size) {
     self = [self wb_initWithSize:size];
     if (self == nil)
         return nil;
 
-    if (Wallpaper_ != nil)
+    if (Wallpaper_ != nil) {
         if (UIImage *image = [[UIImage alloc] initWithContentsOfFile:Wallpaper_])
             [self addSubview:[[[UIImageView alloc] initWithImage:image] autorelease]];
+        [self setBackgroundColor:[UIColor redColor]];
+    }
 
     return self;
 }
@@ -305,14 +322,18 @@ extern "C" void WBInitialize() {
 
     Manager_ = [[NSFileManager defaultManager] retain];
 
-    WBRename("SBApplication", "pathForIcon", (IMP) &SBApplication$pathForIcon);
-    WBRename("NSBundle", "pathForResource:ofType:", (IMP) &NSBundle$pathForResource$ofType$);
-    WBRename("SBAppWindow", "setBackgroundColor:", (IMP) &SBAppWindow$setBackgroundColor$);
-    WBRename("SBContentLayer", "initWithSize:", (IMP) &SBContentLayer$initWithSize$);
+    //WBRename("SBStatusBarContentsView", "setBackgroundColor:", (IMP) &$setBackgroundColor$);
     //WBRename("UINavigationBar", "initWithFrame:", (IMP) &UINavigationBar$initWithFrame$);
     //WBRename("UINavigationBar", "initWithCoder:", (IMP) &UINavigationBar$initWithCoder$);
     WBRename("UINavigationBar", "setBarStyle:", (IMP) &UINavigationBar$setBarStyle$);
     //WBRename("UINavigationBarBackground", "initWithFrame:withBarStyle:withTintColor:", (IMP) &UINavigationBarBackground$initWithFrame$withBarStyle$withTintColor$);
+    //WBRename("SBStatusBarContentsView", "initWithFrame:", (IMP) &SBStatusBarContentsView$initWithFrame$);
+
+    WBRename("SBApplication", "pathForIcon", (IMP) &SBApplication$pathForIcon);
+    WBRename("NSBundle", "pathForResource:ofType:", (IMP) &NSBundle$pathForResource$ofType$);
+    WBRename("SBContentLayer", "initWithSize:", (IMP) &SBContentLayer$initWithSize$);
+    WBRename("SBStatusBarContentsView", "didMoveToSuperview", (IMP) &$didMoveToSuperview);
+    WBRename("SBButtonBar", "didMoveToSuperview", (IMP) &$didMoveToSuperview);
 
     if (NSDictionary *settings = [[NSDictionary alloc] initWithContentsOfFile:[NSString stringWithFormat:@"%@/Library/Preferences/com.saurik.WinterBoard.plist", NSHomeDirectory()]]) {
         [settings autorelease];
