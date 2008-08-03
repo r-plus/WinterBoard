@@ -40,12 +40,19 @@
 #include <objc/runtime.h>
 #include <objc/message.h>
 
+extern "C" {
+    #include <mach-o/nlist.h>
+}
+
 #import <Foundation/Foundation.h>
+#import <CoreGraphics/CoreGraphics.h>
 
 #import <UIKit/UIColor.h>
 #import <UIKit/UIImage.h>
 #import <UIKit/UIImageView.h>
 #import <UIKit/UINavigationBarBackground.h>
+
+#import <UIKit/UIImage-UIImageDeprecated.h>
 
 #import <UIKit/UIView-Geometry.h>
 #import <UIKit/UIView-Hierarchy.h>
@@ -83,18 +90,18 @@ void WBInject(const char *classname, const char *oldname, IMP newimp, const char
     if (_class == nil)
         return;
     if (!class_addMethod(_class, sel_registerName(oldname), newimp, type))
-        NSLog(@"WB: failed to inject [%s %s]", classname, oldname);
+        NSLog(@"WB:Error: failed to inject [%s %s]", classname, oldname);
 }
 
 void WBRename(const char *classname, const char *oldname, IMP newimp) {
     Class _class = objc_getClass(classname);
     if (_class == nil) {
-        NSLog(@"WB: cannot find class [%s]", classname);
+        NSLog(@"WB:Warning: cannot find class [%s]", classname);
         return;
     }
     Method method = class_getInstanceMethod(_class, sel_getUid(oldname));
     if (method == nil) {
-        NSLog(@"WB: cannot find method [%s %s]", classname, oldname);
+        NSLog(@"WB:Warning: cannot find method [%s %s]", classname, oldname);
         return;
     }
     size_t namelen = strlen(oldname);
@@ -103,7 +110,7 @@ void WBRename(const char *classname, const char *oldname, IMP newimp) {
     memcpy(newname + sizeof(WBPrefix) - 1, oldname, namelen + 1);
     const char *type = method_getTypeEncoding(method);
     if (!class_addMethod(_class, sel_registerName(newname), method_getImplementation(method), type))
-        NSLog(@"WB: failed to rename [%s %s]", classname, oldname);
+        NSLog(@"WB:Error: failed to rename [%s %s]", classname, oldname);
     unsigned int count;
     Method *methods = class_copyMethodList(_class, &count);
     for (unsigned int index(0); index != count; ++index)
@@ -111,7 +118,7 @@ void WBRename(const char *classname, const char *oldname, IMP newimp) {
             goto found;
     if (newimp != NULL)
         if (!class_addMethod(_class, sel_getUid(oldname), newimp, type))
-            NSLog(@"WB: failed to rename [%s %s]", classname, oldname);
+            NSLog(@"WB:Error: failed to rename [%s %s]", classname, oldname);
     goto done;
   found:
     if (newimp != NULL)
@@ -133,6 +140,10 @@ void WBRename(const char *classname, const char *oldname, IMP newimp) {
 - (void) wb_setBarStyle:(int)style;
 - (id) wb_initWithFrame:(CGRect)frame withBarStyle:(int)style withTintColor:(UIColor *)color;
 @end
+
+NSMutableDictionary **ImageMap_;
+
+bool Debug_;
 
 NSFileManager *Manager_;
 NSDictionary *Info_;
@@ -164,7 +175,8 @@ NSString *SBApplication$pathForIcon(SBApplication<WinterBoard> *self, SEL sel) {
 }
 
 NSString *NSBundle$pathForResource$ofType$(NSBundle<WinterBoard> *self, SEL sel, NSString *resource, NSString *type) {
-    NSLog(@"WB: NSBundle(%@) pathForResource:%@ ofType:%@", [self bundleIdentifier], resource, type);
+    if (Debug_)
+        NSLog(@"WB:Debug: [NSBundle(%@) pathForResource:\"%@.%@\"]", [self bundleIdentifier], resource, type);
 
     if (theme_ != nil) {
         NSString *identifier = [self bundleIdentifier];
@@ -173,7 +185,6 @@ NSString *NSBundle$pathForResource$ofType$(NSBundle<WinterBoard> *self, SEL sel,
             NSString *path = [NSString stringWithFormat:@"%@/Bundles/%@/%@.%@", theme_, identifier, resource, type];
             if ([Manager_ fileExistsAtPath:path])
                 return path;
-            NSLog(@"p...%@ (%u)", path, [Manager_ fileExistsAtPath:path]);
         }
 
         if ([resource isEqualToString:@"SBDockBG"] && [type isEqualToString:@"png"]) {
@@ -263,10 +274,36 @@ id SBContentLayer$initWithSize$(SBContentLayer<WinterBoard> *self, SEL sel, CGSi
     return self;
 }
 
+extern "C" void FindMappedImages(void);
+extern "C" NSData *UIImagePNGRepresentation(UIImage *);
+
 extern "C" void WBInitialize() {
-    NSLog(@"WB: installing WinterBoard...");
+    NSLog(@"WB:Notice: Installing WinterBoard...");
 
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+
+    struct nlist nl[3];
+    memset(nl, 0, sizeof(nl));
+    nl[0].n_un.n_name = (char *) "___mappedImages";
+    nl[1].n_un.n_name = (char *) "__UISharedImageInitialize";
+    nlist("/System/Library/Frameworks/UIKit.framework/UIKit", nl);
+    ImageMap_ = (id *) nl[0].n_value;
+    void (*__UISharedImageInitialize)(bool) = (void (*)(bool)) nl[1].n_value;
+
+    __UISharedImageInitialize(false);
+
+    /*NSArray *keys = [*ImageMap_ allKeys];
+    for (int i(0), e([keys count]); i != e; ++i) {
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSString *key = [keys objectAtIndex:i];
+        CGImageRef ref = (CGImageRef) [*ImageMap_ objectForKey:key];
+        UIImage *image = [UIImage imageWithCGImage:ref];
+        NSData *data = UIImagePNGRepresentation(image);
+        [data writeToFile:[NSString stringWithFormat:@"/tmp/pwnr/%@", key] atomically:YES];
+        [pool release];
+    }*/
+
+    Manager_ = [[NSFileManager defaultManager] retain];
 
     WBRename("SBApplication", "pathForIcon", (IMP) &SBApplication$pathForIcon);
     WBRename("NSBundle", "pathForResource:ofType:", (IMP) &NSBundle$pathForResource$ofType$);
@@ -276,8 +313,6 @@ extern "C" void WBInitialize() {
     //WBRename("UINavigationBar", "initWithCoder:", (IMP) &UINavigationBar$initWithCoder$);
     WBRename("UINavigationBar", "setBarStyle:", (IMP) &UINavigationBar$setBarStyle$);
     //WBRename("UINavigationBarBackground", "initWithFrame:withBarStyle:withTintColor:", (IMP) &UINavigationBarBackground$initWithFrame$withBarStyle$withTintColor$);
-
-    Manager_ = [[NSFileManager defaultManager] retain];
 
     if (NSDictionary *settings = [[NSDictionary alloc] initWithContentsOfFile:[NSString stringWithFormat:@"%@/Library/Preferences/com.saurik.WinterBoard.plist", NSHomeDirectory()]]) {
         [settings autorelease];
@@ -301,6 +336,17 @@ extern "C" void WBInitialize() {
         NSString *path = [NSString stringWithFormat:@"%@/Wallpaper.png", theme_];
         if ([Manager_ fileExistsAtPath:path])
             Wallpaper_ = [path retain];
+
+        NSString *folder = [NSString stringWithFormat:@"%@/UIImages", theme_];
+        if (NSArray *images = [Manager_ contentsOfDirectoryAtPath:folder error:NULL])
+            for (int i(0), e = [images count]; i != e; ++i) {
+                NSString *name = [images objectAtIndex:i];
+                if (![name hasSuffix:@".png"])
+                    continue;
+                NSString *path = [NSString stringWithFormat:@"%@/%@", folder, name];
+                UIImage *image = [UIImage imageWithContentsOfFile:path];
+                [*ImageMap_ setObject:(id)[image imageRef] forKey:name];
+            }
 
         Info_ = [[NSDictionary alloc] initWithContentsOfFile:[NSString stringWithFormat:@"%@/Info.plist", theme_]];
         if (Info_ == nil) {
