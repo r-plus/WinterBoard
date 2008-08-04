@@ -5,4 +5,10 @@
 <key>NavigationBarStyle</key>
 <string>1</string>
 
+<key>IconLabelStyle</key>
+<string>color: white</string>
+
+<key>DockIconLabelStyle</key>
+<string>color: burlywood</string>
+
 </dict></plist>
