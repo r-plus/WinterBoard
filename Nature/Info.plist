@@ -5,10 +5,13 @@
 <key>NavigationBarStyle</key>
 <string>1</string>
 
-<key>IconLabelStyle</key>
-<string>color: white</string>
+<key>UndockedIconLabelStyle</key>
+<string>font-family: monospace; font-size: 13px; color: white</string>
 
-<key>DockIconLabelStyle</key>
-<string>color: burlywood</string>
+<key>DockedIconLabelStyle</key>
+<string>font-family: monospace; font-size: 13px; oolor: burlywood</string>
+
+<key>TimeStyle</key>
+<string>font-family: monospace; font-size: 16px</string>
 
 </dict></plist>
