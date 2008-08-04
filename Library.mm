@@ -249,9 +249,9 @@ NSString *$pathForFile$inBundle$(NSString *file, NSBundle *bundle) {
             }
 
         if (identifier == nil || ![identifier isEqualToString:@"com.apple.springboard"]);
-            remapResourceName(@"com.apple.springboard/FSO_BG.png", @"StatusBar")
-            remapResourceName(@"com.apple.springboard/SBDockBG.png", @"Dock")
-            remapResourceName(@"com.apple.springboard/SBWeatherCelsius.png", @"Icons/Weather")
+            remapResourceName(@"FSO_BG.png", @"StatusBar")
+            remapResourceName(@"SBDockBG.png", @"Dock")
+            remapResourceName(@"SBWeatherCelsius.png", @"Icons/Weather")
     }
 
     return nil;

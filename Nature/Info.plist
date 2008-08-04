@@ -9,7 +9,7 @@
 <string>font-family: monospace; font-size: 13px; color: white</string>
 
 <key>DockedIconLabelStyle</key>
-<string>font-family: monospace; font-size: 13px; oolor: burlywood</string>
+<string>font-family: monospace; font-size: 13px; color: burlywood</string>
 
 <key>TimeStyle</key>
 <string>font-family: monospace; font-size: 16px</string>
