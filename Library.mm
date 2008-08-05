@@ -214,7 +214,7 @@ NSString *$pathForIcon$(SBApplication<WinterBoard> *self) {
 }
 
 static UIImage *SBApplicationIcon$icon(SBApplicationIcon<WinterBoard> *self, SEL sel) {
-    if (Info_ == nil || ![Info_ boolForKey:@"RenderIcons"])
+    if (Info_ == nil || ![Info_ boolForKey:@"ComposeStoreIcons"])
         if (NSString *path = $pathForIcon$([self application]))
             return [UIImage imageWithContentsOfFile:path];
     return [self wb_icon];
