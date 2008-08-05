@@ -23,9 +23,10 @@ package:
 	mkdir -p winterboard/DEBIAN
 	mkdir -p winterboard/Applications/WinterBoard.app
 	mkdir -p winterboard/Library/Themes
-	cp -a Nature winterboard/Library/Themes/com.saurik.WinterBoard.Nature
+	cp -a Saurik winterboard/Library/Themes
+	find winterboard/Library/Themes/Saurik -name .svn | while read -r line; do rm -rf "$${line}"; done
 	cp -a control preinst postinst prerm winterboard/DEBIAN
 	cp -a Test.sh icon.png WinterBoard.dylib WinterBoard UIImages Info.plist ../pledit/pledit winterboard/Applications/WinterBoard.app
-	dpkg-deb -b winterboard winterboard_0.9.2505-1_iphoneos-arm.deb
+	dpkg-deb -b winterboard winterboard_0.9.2506-1_iphoneos-arm.deb
 
 .PHONY: all clean package

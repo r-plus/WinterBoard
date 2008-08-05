@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-16"?>
+<html><head>
+    <base href="Private/"/>
+    <!--meta name="viewport" content="width=320, minimum-scale=1.0, maximum-scale=1.0"/-->
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+
+    <style>
+        body {
+            background-color: black;
+            margin: 0;
+            padding: 20px 0 0 0;
+            height: 442px;
+            width: 320px;
+        }
+
+        img {
+            -webkit-transition-property: opacity;
+            -webkit-transition-duration: 2s;
+            position: absolute;
+            width: 320px;
+            height: auto;
+        }
+
+        img.fade-out {
+            opacity: 0;
+        }
+
+        img.fade-in {
+            opacity: 1;
+        }
+    </style>
+</head><body style="color: black">
+    <img src="Rock.png" id="rock"/>
+    <img src="Plant.png" id="plant"/>
+
+    <script>
+        var fade_in = rock;
+        var fade_out = plant;
+
+        var fade = function () {
+            fade_in.className = 'fade-out';
+            fade_out.className = 'fade-in';
+
+            var fade_tmp = fade_in;
+            fade_in = fade_out;
+            fade_out = fade_tmp;
+
+            setTimeout(fade, 15000);
+        };
+
+        fade();
+    </script>
+</body></html>
