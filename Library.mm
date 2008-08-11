@@ -103,7 +103,7 @@ extern "C" {
 
 @end
 
-bool Debug_ = true;
+bool Debug_ = false;
 bool Engineer_ = false;
 
 /* WinterBoard Backend {{{ */
@@ -508,12 +508,10 @@ WBDelegate(string_)
 - (NSString *) _iconLabelStyle {
     NSString *key = docked_ ? @"DockedIconLabelStyle" : @"UndockedIconLabelStyle";
     NSString *style = [Info_ objectForKey:key];
-    NSLog(@"WB:Debug:%@ = %@", key, style);
     return style;
 }
 
 - (CGSize) drawInRect:(CGRect)rect withFont:(UIFont *)font lineBreakMode:(int)mode alignment:(int)alignment {
-    _trace();
     if (NSString *custom = [self _iconLabelStyle]) {
         NSString *style = [NSString stringWithFormat:@""
             "font-family: Helvetica; "
@@ -533,7 +531,6 @@ WBDelegate(string_)
 }
 
 - (void) drawInRect:(CGRect)rect withStyle:(NSString *)style {
-    _trace();
     if (NSString *custom = [self _iconLabelStyle]) {
         NSString *combined = [NSString stringWithFormat:@"%@; %@", style, custom];
         if (Debug_)
@@ -722,6 +719,13 @@ extern "C" void WBInitialize() {
                     [Info_ setObject:[info objectForKey:key] forKey:key];
     }
 
+    if ([Info_ objectForKey:@"UndockedIconLabels"] == nil)
+        [Info_ setObject:[NSNumber numberWithBool:(
+            [Info_ objectForKey:@"DockedIconLabelStyle"] != nil ||
+            [Info_ objectForKey:@"UndockedIconLabelStyle"] != nil
+        )] forKey:@"UndockedIconLabels"];
+
+    if (![Info_ boolForKey:@"UndockedIconLabels"])
     if (Debug_)
         NSLog(@"WB:Debug:Info = %@", [Info_ description]);
 

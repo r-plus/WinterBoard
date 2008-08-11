@@ -43,6 +43,7 @@
 
 static NSString *plist_;
 static NSMutableDictionary *settings_;
+static BOOL changed_;
 
 @interface WBThemeTableViewCell : UITableViewCell {
     UILabel *label;
@@ -76,8 +77,11 @@ static NSMutableDictionary *settings_;
 }
 
 - (void) applicationWillTerminate:(UIApplication *)application {
-    [settings_ writeToFile:plist_ atomically:YES];
-    system("killall SpringBoard");
+    if (changed_) {
+        if (![settings_ writeToFile:plist_ atomically:YES])
+            NSLog(@"WB:Error:writeToFile");
+        system("killall SpringBoard");
+    }
 }
 
 - (UITableViewCell *) tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
@@ -99,6 +103,7 @@ static NSMutableDictionary *settings_;
     [theme setObject:[NSNumber numberWithBool:inactive] forKey:@"Active"];
     cell.accessoryType = inactive ? UITableViewCellAccessoryCheckmark : UITableViewCellAccessoryNone;
     [themesTable_ deselectRowAtIndexPath:(NSIndexPath *)indexPath animated:YES];
+    changed_ = YES;
 }
 
 - (NSInteger) tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section {
@@ -117,6 +122,7 @@ static NSMutableDictionary *settings_;
     NSMutableDictionary *theme = [[[themesArray_ objectAtIndex:fromIndex] retain] autorelease];
     [themesArray_ removeObjectAtIndex:fromIndex];
     [themesArray_ insertObject:theme atIndex:toIndex];
+    changed_ = YES;
 }
 
 - (BOOL) tableView:(UITableView *)tableView canMoveRowAtIndexPath:(NSIndexPath *)indexPath {
@@ -132,6 +138,8 @@ static NSMutableDictionary *settings_;
     ] retain];
 
     settings_ = [[NSMutableDictionary alloc] initWithContentsOfFile:plist_];
+    if (settings_ == nil)
+        settings_ = [[NSMutableDictionary alloc] initWithCapacity:16];
 
     themesArray_ = [settings_ objectForKey:@"Themes"];
     if (themesArray_ == nil) {
@@ -162,9 +170,22 @@ static NSMutableDictionary *settings_;
     [themes addObjectsFromArray:[manager contentsOfDirectoryAtPath:@"/Library/Themes" error:NULL]];
     [themes addObjectsFromArray:[manager contentsOfDirectoryAtPath:[NSString stringWithFormat:@"%@/Library/SummerBoard/Themes", NSHomeDirectory()] error:NULL]];
 
-    for (NSString *theme in themes) {
+    for (NSUInteger i(0), e([themes count]); i != e; ++i) {
+        NSString *theme = [themes objectAtIndex:i];
         if ([theme hasSuffix:@".theme"])
-            theme = [theme substringWithRange:NSMakeRange(0, [theme length] - 6)];
+            [themes replaceObjectAtIndex:i withObject:[theme substringWithRange:NSMakeRange(0, [theme length] - 6)]];
+    }
+
+    for (NSUInteger i(0), e([themesArray_ count]); i != e; ++i) {
+        NSMutableDictionary *theme = [themesArray_ objectAtIndex:i];
+        NSString *name = [theme objectForKey:@"Name"];
+        if (name == nil || ![themes containsObject:name]) {
+            [themesArray_ removeObjectAtIndex:i];
+            --i; --e;
+        }
+    }
+
+    for (NSString *theme in themes) {
         if ([themesSet containsObject:theme])
             continue;
         [themesSet addObject:theme];
