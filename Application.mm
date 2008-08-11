@@ -39,7 +39,21 @@
 #import <CoreGraphics/CGGeometry.h>
 #import <UIKit/UIKit.h>
 
-#define _trace() NSLog(@"_trace(%u)", __LINE__);
+#define _trace() NSLog(@"WE:_trace(%u)", __LINE__);
+
+static NSString *plist_;
+static NSMutableDictionary *settings_;
+
+@interface WBThemeTableViewCell : UITableViewCell {
+    UILabel *label;
+}
+
+@end
+
+@implementation WBThemeTableViewCell
+
+
+@end
 
 @interface WBApplication : UIApplication <
     UITableViewDataSource,
@@ -61,46 +75,113 @@
     [super dealloc];
 }
 
+- (void) applicationWillTerminate:(UIApplication *)application {
+    [settings_ writeToFile:plist_ atomically:YES];
+    system("killall SpringBoard");
+}
+
 - (UITableViewCell *) tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
     UITableViewCell *cell = [[[UITableViewCell alloc] initWithFrame:CGRectZero] autorelease];
-    cell.text = [themesArray_ objectAtIndex:[indexPath row]];
+    NSMutableDictionary *theme = [themesArray_ objectAtIndex:[indexPath row]];
+    cell.text = [theme objectForKey:@"Name"];
+    cell.hidesAccessoryWhenEditing = NO;
+    NSNumber *active = [theme objectForKey:@"Active"];
+    BOOL inactive = active == nil || ![active boolValue];
+    cell.accessoryType = inactive ? UITableViewCellAccessoryNone : UITableViewCellAccessoryCheckmark;
     return cell;
+}
+
+- (void) tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
+    UITableViewCell *cell = [tableView cellForRowAtIndexPath:indexPath];
+    NSMutableDictionary *theme = [themesArray_ objectAtIndex:[indexPath row]];
+    NSNumber *active = [theme objectForKey:@"Active"];
+    BOOL inactive = active == nil || ![active boolValue];
+    [theme setObject:[NSNumber numberWithBool:inactive] forKey:@"Active"];
+    cell.accessoryType = inactive ? UITableViewCellAccessoryCheckmark : UITableViewCellAccessoryNone;
+    [themesTable_ deselectRowAtIndexPath:(NSIndexPath *)indexPath animated:YES];
 }
 
 - (NSInteger) tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section {
     return [themesArray_ count];
 }
 
-- (void) tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
-    NSString *theme = [themesArray_ objectAtIndex:[indexPath row]];
+- (UITableViewCellEditingStyle) tableView:(UITableView *)tableView editingStyleForRowAtIndexPath:(NSIndexPath *)indexPath {
+    return UITableViewCellEditingStyleNone;
+}
 
-    [[NSDictionary dictionaryWithObjectsAndKeys:
-        theme, @"Theme",
-    nil] writeToFile:[NSString stringWithFormat:@"%@/Library/Preferences/com.saurik.WinterBoard.plist",
-        NSHomeDirectory()
-    ] atomically:YES];
+- (void) tableView:(UITableView *)tableView moveRowAtIndexPath:(NSIndexPath *)fromIndexPath toIndexPath:(NSIndexPath *)toIndexPath {
+    NSUInteger fromIndex = [fromIndexPath row];
+    NSUInteger toIndex = [toIndexPath row];
+    if (fromIndex == toIndex)
+        return;
+    NSMutableDictionary *theme = [[[themesArray_ objectAtIndex:fromIndex] retain] autorelease];
+    [themesArray_ removeObjectAtIndex:fromIndex];
+    [themesArray_ insertObject:theme atIndex:toIndex];
+}
 
-    if (fork() == 0) {
-        execlp("killall", "killall", "SpringBoard", NULL);
-        exit(0);
-    }
+- (BOOL) tableView:(UITableView *)tableView canMoveRowAtIndexPath:(NSIndexPath *)indexPath {
+    return YES;
 }
 
 - (void) applicationDidFinishLaunching:(id)unused {
     window_ = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].applicationFrame];
     [window_ makeKeyAndVisible];
 
-    themesArray_ = [[NSMutableArray arrayWithCapacity:32] retain];
+    plist_ = [[NSString stringWithFormat:@"%@/Library/Preferences/com.saurik.WinterBoard.plist",
+        NSHomeDirectory()
+    ] retain];
+
+    settings_ = [[NSMutableDictionary alloc] initWithContentsOfFile:plist_];
+
+    themesArray_ = [settings_ objectForKey:@"Themes"];
+    if (themesArray_ == nil) {
+        if (NSString *theme = [settings_ objectForKey:@"Theme"]) {
+            themesArray_ = [[NSArray arrayWithObject:[[NSDictionary dictionaryWithObjectsAndKeys:
+                theme, @"Name",
+                [NSNumber numberWithBool:YES], @"Active",
+            nil] mutableCopy]] mutableCopy];
+
+            [settings_ removeObjectForKey:@"Theme"];
+        }
+
+        if (themesArray_ == nil)
+            themesArray_ = [NSMutableArray arrayWithCapacity:16];
+        [settings_ setObject:themesArray_ forKey:@"Themes"];
+    }
+
+    themesArray_ = [themesArray_ retain];
+
+    NSMutableSet *themesSet = [NSMutableSet setWithCapacity:32];
+    for (NSMutableDictionary *theme in themesArray_)
+        if (NSString *name = [theme objectForKey:@"Name"])
+            [themesSet addObject:name];
+
     NSFileManager *manager = [NSFileManager defaultManager];
 
-    [themesArray_ addObjectsFromArray:[manager contentsOfDirectoryAtPath:@"/Library/Themes" error:NULL]];
-    [themesArray_ addObjectsFromArray:[manager contentsOfDirectoryAtPath:[NSString stringWithFormat:@"%@/Library/SummerBoard/Themes", NSHomeDirectory()] error:NULL]];
+    NSMutableArray *themes = [NSMutableArray arrayWithCapacity:32];
+    [themes addObjectsFromArray:[manager contentsOfDirectoryAtPath:@"/Library/Themes" error:NULL]];
+    [themes addObjectsFromArray:[manager contentsOfDirectoryAtPath:[NSString stringWithFormat:@"%@/Library/SummerBoard/Themes", NSHomeDirectory()] error:NULL]];
+
+    for (NSString *theme in themes) {
+        if ([theme hasSuffix:@".theme"])
+            theme = [theme substringWithRange:NSMakeRange(0, [theme length] - 6)];
+        if ([themesSet containsObject:theme])
+            continue;
+        [themesSet addObject:theme];
+        [themesArray_ addObject:[[NSDictionary dictionaryWithObjectsAndKeys:
+            theme, @"Name",
+            [NSNumber numberWithBool:NO], @"Active",
+        nil] mutableCopy]];
+    }
 
     themesTable_ = [[UITableView alloc] initWithFrame:window_.bounds];
     [window_ addSubview:themesTable_];
 
     [themesTable_ setDataSource:self];
     [themesTable_ setDelegate:self];
+
+    [themesTable_ setEditing:YES animated:NO];
+    themesTable_.allowsSelectionDuringEditing = YES;
 
     [themesTable_ setSeparatorStyle:UITableViewCellSeparatorStyleSingleLine];
 }

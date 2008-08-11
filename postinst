@@ -1,6 +1,0 @@
-#!/bin/sh
-
-if [[ $1 == configure ]]; then
-    /Applications/WinterBoard.app/pledit /System/Library/LaunchDaemons/com.apple.SpringBoard.plist \
-        -a /Applications/WinterBoard.app/WinterBoard.dylib
-fi

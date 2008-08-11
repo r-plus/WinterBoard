@@ -1,6 +1,10 @@
 #!/bin/sh
 
+declare -a cydia
+cydia=($CYDIA)
+
 if [[ $1 == remove ]]; then
-    /Applications/WinterBoard.app/pledit /System/Library/LaunchDaemons/com.apple.SpringBoard.plist \
-        -r /Applications/WinterBoard.app/WinterBoard.dylib
+    if [[ ${CYDIA+@} ]]; then
+        eval "echo 'finish:restart' >&${cydia[0]}"
+    fi
 fi

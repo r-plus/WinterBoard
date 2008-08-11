@@ -71,8 +71,12 @@ extern "C" {
 #import <SpringBoard/SBContentLayer.h>
 #import <SpringBoard/SBIconLabel.h>
 #import <SpringBoard/SBStatusBarContentsView.h>
+#import <SpringBoard/SBStatusBarController.h>
 #import <SpringBoard/SBStatusBarTimeView.h>
 #import <SpringBoard/SBUIController.h>
+
+#import <MediaPlayer/MPVideoView.h>
+#import <MediaPlayer/MPVideoView-PlaybackControl.h>
 
 #import <CoreGraphics/CGGeometry.h>
 
@@ -99,7 +103,7 @@ extern "C" {
 
 @end
 
-bool Debug_ = false;
+bool Debug_ = true;
 bool Engineer_ = false;
 
 /* WinterBoard Backend {{{ */
@@ -171,82 +175,106 @@ void WBRename(bool instance, const char *classname, const char *oldname, IMP new
 - (void) wb_setInDock:(BOOL)docked;
 - (void) wb_didMoveToSuperview;
 + (UIImage *) wb_imageNamed:(NSString *)name inBundle:(NSBundle *)bundle;
++ (UIImage *) wb_applicationImageNamed:(NSString *)name;
 - (NSDictionary *) wb_infoDictionary;
 - (UIImage *) wb_icon;
+- (id) wb_initWithStatusBar:(id)bar mode:(int)mode;
+- (id) wb_initWithMode:(int)mode orientation:(int)orientation;
+- (void) wb_setStatusBarMode:(int)mode orientation:(int)orientation duration:(float)duration fenceID:(int)id animation:(int)animation;
 @end
 
 NSMutableDictionary **ImageMap_;
+NSMutableSet *UIImages_;
 
 NSFileManager *Manager_;
 NSDictionary *English_;
-NSDictionary *Info_;
-NSString *theme_;
+NSMutableDictionary *Info_;
+NSMutableArray *themes_;
 
 NSString *$pathForIcon$(SBApplication<WinterBoard> *self) {
-    NSString *identifier = [self bundleIdentifier];
+    for (NSString *theme in themes_) {
+        NSString *identifier = [self bundleIdentifier];
+        NSString *folder = [[self path] lastPathComponent];
+        NSString *dname = [self displayName];
+        NSString *didentifier = [self displayIdentifier];
 
-    #define testForIcon(Name) \
-        if (NSString *name = Name) { \
-            NSString *path = [NSString stringWithFormat:@"%@/Icons/%@.png", theme_, name]; \
-            if ([Manager_ fileExistsAtPath:path]) \
-                return path; \
+        if (Debug_) {
+            NSLog(@"WB:Debug: [SBApplication(%@:%@:%@:%@) pathForIcon]", identifier, folder, dname, didentifier);
         }
 
-    if (identifier != nil) {
-        NSString *path = [NSString stringWithFormat:@"%@/Bundles/%@/icon.png", theme_, identifier];
-        if ([Manager_ fileExistsAtPath:path])
-            return path;
+        #define testForIcon(Name) \
+            if (NSString *name = Name) { \
+                NSString *path = [NSString stringWithFormat:@"%@/Icons/%@.png", theme, name]; \
+                if ([Manager_ fileExistsAtPath:path]) \
+                    return path; \
+            }
+
+        if (identifier != nil) {
+            NSString *path = [NSString stringWithFormat:@"%@/Bundles/%@/icon.png", theme, identifier];
+            if ([Manager_ fileExistsAtPath:path])
+                return path;
+        }
+
+        if (folder != nil) {
+            NSString *path = [NSString stringWithFormat:@"%@/Folders/%@/icon.png", theme, folder];
+            if ([Manager_ fileExistsAtPath:path])
+                return path;
+        }
+
+        testForIcon(identifier);
+        testForIcon(dname);
+
+        if (didentifier != nil) {
+            testForIcon([English_ objectForKey:didentifier]);
+
+            NSArray *parts = [didentifier componentsSeparatedByString:@"-"];
+            if ([parts count] != 1)
+                if (NSDictionary *english = [[[NSDictionary alloc] initWithContentsOfFile:[[self path] stringByAppendingString:@"/English.lproj/UIRoleDisplayNames.strings"]] autorelease])
+                    testForIcon([english objectForKey:[parts lastObject]]);
+        }
     }
-
-    if (NSString *folder = [[self path] lastPathComponent]) {
-        NSString *path = [NSString stringWithFormat:@"%@/Folders/%@/icon.png", theme_, folder];
-        if ([Manager_ fileExistsAtPath:path])
-            return path;
-    }
-
-    testForIcon(identifier);
-    testForIcon([self displayName]);
-
-    if (NSString *display = [self displayIdentifier])
-        testForIcon([English_ objectForKey:display]);
 
     return nil;
 }
 
 static UIImage *SBApplicationIcon$icon(SBApplicationIcon<WinterBoard> *self, SEL sel) {
-    if (Info_ == nil || ![Info_ boolForKey:@"ComposeStoreIcons"])
+    if (![Info_ boolForKey:@"ComposeStoreIcons"])
         if (NSString *path = $pathForIcon$([self application]))
             return [UIImage imageWithContentsOfFile:path];
     return [self wb_icon];
 }
 
 static NSString *SBApplication$pathForIcon(SBApplication<WinterBoard> *self, SEL sel) {
-    if (theme_ != nil)
-        if (NSString *path = $pathForIcon$(self))
-            return path;
-
+    if (NSString *path = $pathForIcon$(self))
+        return path;
     return [self wb_pathForIcon];
 }
 
 static NSString *$pathForFile$inBundle$(NSString *file, NSBundle *bundle) {
-    if (theme_ != nil) {
+    for (NSString *theme in themes_) {
         NSString *identifier = [bundle bundleIdentifier];
 
         if (identifier != nil) {
-            NSString *path = [NSString stringWithFormat:@"%@/Bundles/%@/%@", theme_, identifier, file];
+            NSString *path = [NSString stringWithFormat:@"%@/Bundles/%@/%@", theme, identifier, file];
+            if (Debug_)
+                NSLog(@"WB:Debug:%@", path);
             if ([Manager_ fileExistsAtPath:path])
                 return path;
         }
 
         if (NSString *folder = [[bundle bundlePath] lastPathComponent]) {
-            NSString *path = [NSString stringWithFormat:@"%@/Folders/%@/%@", theme_, folder, file];
+            NSString *path = [NSString stringWithFormat:@"%@/Folders/%@/%@", theme, folder, file];
+            if (Debug_)
+                NSLog(@"WB:Debug:%@", path);
             if ([Manager_ fileExistsAtPath:path])
                 return path;
         }
 
         #define remapResourceName(oldname, newname) \
             else if ([file isEqualToString:oldname]) { \
-                NSString *path = [NSString stringWithFormat:@"%@/%@.png", theme_, newname]; \
+                NSString *path = [NSString stringWithFormat:@"%@/%@.png", theme, newname]; \
+                if (Debug_) \
+                    NSLog(@"WB:Debug:%@", path); \
                 if ([Manager_ fileExistsAtPath:path]) \
                     return path; \
             }
@@ -272,6 +300,15 @@ static UIImage *UIImage$imageNamed$(Class<WinterBoard> self, SEL sel, NSString *
     return UIImage$imageNamed$inBundle$(self, sel, name, [NSBundle mainBundle]);
 }
 
+static UIImage *UIImage$applicationImageNamed$(Class<WinterBoard> self, SEL sel, NSString *name) {
+    NSBundle *bundle = [NSBundle mainBundle];
+    if (Debug_)
+        NSLog(@"WB:Debug: [UIImage(%@) applicationImageNamed:\"%@\"]", [bundle bundleIdentifier], name);
+    if (NSString *path = $pathForFile$inBundle$(name, bundle))
+        return [UIImage imageWithContentsOfFile:path];
+    return [self wb_applicationImageNamed:name];
+}
+
 static NSString *NSBundle$pathForResource$ofType$(NSBundle<WinterBoard> *self, SEL sel, NSString *resource, NSString *type) {
     NSString *file = type == nil ? resource : [NSString stringWithFormat:@"%@.%@", resource, type];
     if (Debug_)
@@ -282,12 +319,9 @@ static NSString *NSBundle$pathForResource$ofType$(NSBundle<WinterBoard> *self, S
 }
 
 bool UINavigationBar$setBarStyle$_(SBAppWindow<WinterBoard> *self) {
-    if (Info_ != nil) {
-        NSNumber *number = [Info_ objectForKey:@"NavigationBarStyle"];
-        if (number != nil) {
-            [self wb_setBarStyle:[number intValue]];
-            return true;
-        }
+    if (NSNumber *number = [Info_ objectForKey:@"NavigationBarStyle"]) {
+        [self wb_setBarStyle:[number intValue]];
+        return true;
     }
 
     return false;
@@ -296,15 +330,11 @@ bool UINavigationBar$setBarStyle$_(SBAppWindow<WinterBoard> *self) {
 /*id UINavigationBarBackground$initWithFrame$withBarStyle$withTintColor$(UINavigationBarBackground<WinterBoard> *self, SEL sel, CGRect frame, int style, UIColor *tint) {
     _trace();
 
-    if (Info_ != nil) {
-        NSNumber *number = [Info_ objectForKey:@"NavigationBarStyle"];
-        if (number != nil)
-            style = [number intValue];
+    if (NSNumber *number = [Info_ objectForKey:@"NavigationBarStyle"])
+        style = [number intValue];
 
-        UIColor *color = [Info_ colorForKey:@"NavigationBarTint"];
-        if (color != nil)
-            tint = color;
-    }
+    if (UIColor *color = [Info_ colorForKey:@"NavigationBarTint"])
+        tint = color;
 
     return [self wb_initWithFrame:frame withBarStyle:style withTintColor:tint];
 }*/
@@ -336,9 +366,15 @@ static void $didMoveToSuperview(SBButtonBar<WinterBoard> *self, SEL sel) {
     [self wb_didMoveToSuperview];
 }
 
-static NSString *$getTheme$(NSString *file) {
-    NSString *path([NSString stringWithFormat:@"%@/%@", theme_, file]);
-    return [Manager_ fileExistsAtPath:path] ? path : nil;
+static NSString *$getTheme$(NSArray *files) {
+    for (NSString *theme in themes_)
+        for (NSString *file in files) {
+            NSString *path([NSString stringWithFormat:@"%@/%@", theme, file]);
+            if ([Manager_ fileExistsAtPath:path])
+                return path;
+        }
+
+    return nil;
 }
 
 static id SBContentLayer$initWithSize$(SBContentLayer<WinterBoard> *self, SEL sel, CGSize size) {
@@ -346,10 +382,20 @@ static id SBContentLayer$initWithSize$(SBContentLayer<WinterBoard> *self, SEL se
     if (self == nil)
         return nil;
 
-    if (NSString *path = $getTheme$(@"Wallpaper.png"))
+    if (NSString *path = $getTheme$([NSArray arrayWithObject:@"Wallpaper.mp4"])) {
+        MPVideoView *video = [[[MPVideoView alloc] initWithFrame:[self bounds]] autorelease];
+        [video setMovieWithPath:path];
+        [video setRepeatMode:1];
+        [video setRepeatGap:0];
+        [self addSubview:video];
+        [video playFromBeginning];;
+    }
+
+    if (NSString *path = $getTheme$([NSArray arrayWithObjects:@"Wallpaper.png", @"Wallpaper.jpg", nil]))
         if (UIImage *image = [[[UIImage alloc] initWithContentsOfFile:path] autorelease])
             [self addSubview:[[[UIImageView alloc] initWithImage:image] autorelease]];
-    if (NSString *path = $getTheme$(@"Wallpaper.html")) {
+
+    if (NSString *path = $getTheme$([NSArray arrayWithObject:@"Wallpaper.html"])) {
         CGRect bounds = [self bounds];
 
         UIWebDocumentView *view([[[UIWebDocumentView alloc] initWithFrame:bounds] autorelease]);
@@ -417,20 +463,19 @@ extern "C" NSString *UIStyleStringFromColor(CGColorRef);
 WBDelegate(time_)
 
 - (CGSize) drawAtPoint:(CGPoint)point forWidth:(float)width withFont:(UIFont *)font lineBreakMode:(int)mode {
-    if (Info_ != nil)
-        if (NSString *custom = [Info_ objectForKey:@"TimeStyle"]) {
-            BOOL mode;
-            object_getInstanceVariable(view_, "_mode", (void **) &mode);
+    if (NSString *custom = [Info_ objectForKey:@"TimeStyle"]) {
+        BOOL mode;
+        object_getInstanceVariable(view_, "_mode", (void **) &mode);
 
-            [time_ drawAtPoint:point withStyle:[NSString stringWithFormat:@""
-                "font-family: Helvetica; "
-                "font-weight: bold; "
-                "font-size: 14px; "
-                "color: %@; "
-            "%@", mode ? @"white" : @"black", custom]];
+        [time_ drawAtPoint:point withStyle:[NSString stringWithFormat:@""
+            "font-family: Helvetica; "
+            "font-weight: bold; "
+            "font-size: 14px; "
+            "color: %@; "
+        "%@", mode ? @"white" : @"black", custom]];
 
-            return CGSizeZero;
-        }
+        return CGSizeZero;
+    }
 
     return [time_ drawAtPoint:point forWidth:width withFont:font lineBreakMode:mode];
 }
@@ -461,19 +506,26 @@ WBDelegate(time_)
 WBDelegate(string_)
 
 - (NSString *) _iconLabelStyle {
-    return Info_ == nil ? nil : [Info_ objectForKey:(docked_ ? @"DockedIconLabelStyle" : @"UndockedIconLabelStyle")];
+    NSString *key = docked_ ? @"DockedIconLabelStyle" : @"UndockedIconLabelStyle";
+    NSString *style = [Info_ objectForKey:key];
+    NSLog(@"WB:Debug:%@ = %@", key, style);
+    return style;
 }
 
 - (CGSize) drawInRect:(CGRect)rect withFont:(UIFont *)font lineBreakMode:(int)mode alignment:(int)alignment {
+    _trace();
     if (NSString *custom = [self _iconLabelStyle]) {
-        [string_ drawInRect:rect withStyle:[NSString stringWithFormat:@""
+        NSString *style = [NSString stringWithFormat:@""
             "font-family: Helvetica; "
             "font-weight: bold; "
             "font-size: 11px; "
             "text-align: center; "
             "color: %@; "
-        "%@", docked_ ? @"white" : @"#b3b3b3", custom]];
+        "%@", docked_ ? @"white" : @"#b3b3b3", custom];
 
+        if (Debug_)
+            NSLog(@"WB:Debug:style = %@", style);
+        [string_ drawInRect:rect withStyle:style];
         return CGSizeZero;
     }
 
@@ -481,8 +533,13 @@ WBDelegate(string_)
 }
 
 - (void) drawInRect:(CGRect)rect withStyle:(NSString *)style {
-    if (NSString *custom = [self _iconLabelStyle])
-        return [string_ drawInRect:rect withStyle:[NSString stringWithFormat:@"%@; %@", style, custom]];
+    _trace();
+    if (NSString *custom = [self _iconLabelStyle]) {
+        NSString *combined = [NSString stringWithFormat:@"%@; %@", style, custom];
+        if (Debug_)
+            NSLog(@"WB:Debug:combined = %@", combined);
+        return [string_ drawInRect:rect withStyle:combined];
+    }
     return [string_ drawInRect:rect withStyle:style];
 }
 
@@ -498,6 +555,22 @@ WBDelegate(string_)
 
 @end
 
+static void SBStatusBarController$setStatusBarMode$orientation$duration$fenceID$animation$(SBStatusBarController<WinterBoard> *self, SEL sel, int mode, int orientation, float duration, int id, int animation) {
+    if (NSNumber *number = [Info_ objectForKey:@"StatusBarMode"])
+        mode = [number intValue];
+    return [self wb_setStatusBarMode:mode orientation:orientation duration:duration fenceID:id animation:animation];
+}
+
+/*static id SBStatusBar$initWithMode$orientation$(SBStatusBar<WinterBoard> *self, SEL sel, int mode, int orientation) {
+    return [self wb_initWithMode:mode orientation:orientation];
+}*/
+
+static id SBStatusBarContentsView$initWithStatusBar$mode$(SBStatusBarContentsView<WinterBoard> *self, SEL sel, id bar, int mode) {
+    if (NSNumber *number = [Info_ objectForKey:@"StatusBarContentsMode"])
+        mode = [number intValue];
+    return [self wb_initWithStatusBar:bar mode:mode];
+}
+
 static void SBStatusBarTimeView$drawRect$(SBStatusBarTimeView<WinterBoard> *self, SEL sel, CGRect rect) {
     id time;
     object_getInstanceVariable(self, "_time", (void **) &time);
@@ -509,7 +582,7 @@ static void SBStatusBarTimeView$drawRect$(SBStatusBarTimeView<WinterBoard> *self
 static void SBIconLabel$setInDock$(SBIconLabel<WinterBoard> *self, SEL sel, BOOL docked) {
     id label;
     object_getInstanceVariable(self, "_label", (void **) &label);
-    if (Info_ == nil || [Info_ boolForKey:@"IconLabelInDock"])
+    if (![Info_ boolForKey:@"UndockedIconLabels"])
         docked = YES;
     if (label != nil && [label respondsToSelector:@selector(setInDock:)])
         [label setInDock:docked];
@@ -554,6 +627,7 @@ extern "C" void WBInitialize() {
         English_ = [English_ retain];
 
     Manager_ = [[NSFileManager defaultManager] retain];
+    UIImages_ = [[NSMutableSet alloc] initWithCapacity:16];
 
     //WBRename("UINavigationBar", "initWithCoder:", (IMP) &UINavigationBar$initWithCoder$);
     WBRename(true, "UINavigationBar", "setBarStyle:", (IMP) &UINavigationBar$setBarStyle$);
@@ -561,48 +635,95 @@ extern "C" void WBInitialize() {
 
     WBRename(false, "UIImage", "imageNamed:inBundle:", (IMP) &UIImage$imageNamed$inBundle$);
     WBRename(false, "UIImage", "imageNamed:", (IMP) &UIImage$imageNamed$);
+    WBRename(false, "UIImage", "applicationImageNamed:", (IMP) &UIImage$applicationImageNamed$);
     WBRename(true, "SBApplicationIcon", "icon", (IMP) &SBApplicationIcon$icon);
     WBRename(true, "SBApplication", "pathForIcon", (IMP) &SBApplication$pathForIcon);
     WBRename(true, "NSBundle", "pathForResource:ofType:", (IMP) &NSBundle$pathForResource$ofType$);
     WBRename(true, "SBContentLayer", "initWithSize:", (IMP) &SBContentLayer$initWithSize$);
+    WBRename(true, "SBStatusBarContentsView", "initWithStatusBar:mode:", (IMP) &SBStatusBarContentsView$initWithStatusBar$mode$);
+    //WBRename(true, "SBStatusBar", "initWithMode:orientation:", (IMP) &SBStatusBar$initWithMode$orientation$);
     WBRename(true, "SBStatusBarContentsView", "didMoveToSuperview", (IMP) &$didMoveToSuperview);
     WBRename(true, "SBButtonBar", "didMoveToSuperview", (IMP) &$didMoveToSuperview);
     WBRename(true, "SBIconLabel", "setInDock:", (IMP) &SBIconLabel$setInDock$);
     WBRename(true, "SBIconLabel", "initWithSize:label:", (IMP) &SBIconLabel$initWithSize$label$);
     WBRename(true, "SBStatusBarTimeView", "drawRect:", (IMP) &SBStatusBarTimeView$drawRect$);
+    WBRename(true, "SBStatusBarController", "setStatusBarMode:orientation:duration:fenceID:animation:", (IMP) &SBStatusBarController$setStatusBarMode$orientation$duration$fenceID$animation$);
 
-    if (NSDictionary *settings = [[NSDictionary alloc] initWithContentsOfFile:[NSString stringWithFormat:@"%@/Library/Preferences/com.saurik.WinterBoard.plist", NSHomeDirectory()]]) {
+    themes_ = [[NSMutableArray alloc] initWithCapacity:8];
+
+    if (NSDictionary *settings = [[NSDictionary alloc] initWithContentsOfFile:[NSString stringWithFormat:@"/User/Library/Preferences/com.saurik.WinterBoard.plist"]]) {
         [settings autorelease];
-        NSString *name = [settings objectForKey:@"Theme"];
-        NSString *path;
 
-        if (theme_ == nil) {
-            path = [NSString stringWithFormat:@"%@/Library/SummerBoard/Themes/%@", NSHomeDirectory(), name];
-            if ([Manager_ fileExistsAtPath:path])
-                theme_ = [path retain];
-        }
+        NSArray *themes = [settings objectForKey:@"Themes"];
+        if (themes == nil)
+            if (NSString *theme = [settings objectForKey:@"Theme"])
+                themes = [NSArray arrayWithObject:[NSDictionary dictionaryWithObjectsAndKeys:
+                    theme, @"Name",
+                    [NSNumber numberWithBool:YES], @"Active",
+                nil]];
+        if (themes != nil)
+            for (NSDictionary *theme in themes) {
+                NSNumber *active = [theme objectForKey:@"Active"];
+                if (![active boolValue])
+                    continue;
 
-        if (theme_ == nil) {
-            path = [NSString stringWithFormat:@"/Library/Themes/%@", name];
-            if ([Manager_ fileExistsAtPath:path])
-                theme_ = [path retain];
-        }
+                NSString *name = [theme objectForKey:@"Name"];
+                if (name == nil)
+                    continue;
+
+                NSString *theme = nil;
+
+                if (theme == nil) {
+                    NSString *path = [NSString stringWithFormat:@"/Library/Themes/%@.theme", name];
+                    if ([Manager_ fileExistsAtPath:path]) {
+                        [themes_ addObject:path];
+                        continue;
+                    }
+                }
+
+                if (theme == nil) {
+                    NSString *path = [NSString stringWithFormat:@"/Library/Themes/%@", name];
+                    if ([Manager_ fileExistsAtPath:path]) {
+                        [themes_ addObject:path];
+                        continue;
+                    }
+                }
+
+                if (theme == nil) {
+                    NSString *path = [NSString stringWithFormat:@"%@/Library/SummerBoard/Themes/%@", NSHomeDirectory(), name];
+                    if ([Manager_ fileExistsAtPath:path]) {
+                        [themes_ addObject:path];
+                        continue;
+                    }
+                }
+            }
     }
 
-    if (theme_ != nil) {
-        NSString *folder = [NSString stringWithFormat:@"%@/UIImages", theme_];
+    Info_ = [[NSMutableDictionary dictionaryWithCapacity:16] retain];
+
+    for (NSString *theme in themes_) {
+        NSString *folder = [NSString stringWithFormat:@"%@/UIImages", theme];
         if (NSArray *images = [Manager_ contentsOfDirectoryAtPath:folder error:NULL])
             for (int i(0), e = [images count]; i != e; ++i) {
                 NSString *name = [images objectAtIndex:i];
                 if (![name hasSuffix:@".png"])
                     continue;
+                if ([UIImages_ containsObject:name])
+                    continue;
                 NSString *path = [NSString stringWithFormat:@"%@/%@", folder, name];
                 UIImage *image = [UIImage imageWithContentsOfFile:path];
                 [*ImageMap_ setObject:(id)[image imageRef] forKey:name];
+                [UIImages_ addObject:name];
             }
 
-        Info_ = [[NSDictionary alloc] initWithContentsOfFile:[NSString stringWithFormat:@"%@/Info.plist", theme_]];
+        if (NSDictionary *info = [[NSDictionary alloc] initWithContentsOfFile:[NSString stringWithFormat:@"%@/Info.plist", theme]])
+            for (NSString *key in [info allKeys])
+                if ([Info_ objectForKey:key] == nil)
+                    [Info_ setObject:[info objectForKey:key] forKey:key];
     }
+
+    if (Debug_)
+        NSLog(@"WB:Debug:Info = %@", [Info_ description]);
 
     [pool release];
 }

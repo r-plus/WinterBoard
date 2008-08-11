@@ -1,20 +1,17 @@
 Package: winterboard
 Priority: optional
-Section: Themes
+Section: System
 Maintainer: Jay Freeman (saurik) <saurik@saurik.com>
 Architecture: iphoneos-arm
-Version: 0.9.2506-1
+Version: 0.9.2519-1
 Description: more powerful, open-source SummerBoard
- After you install or uninstall this package you will have to /reboot/ (seriously, REBOOT) your phone to it to take effect.
+ This tool lets you give your device a graphical overhaul. Themes are taken from /Library/Themes (or, now, the older SummerBoard folder). Using the relatively simple frontend you can activate and deactivate multiple themes and give them a priority ordering.
  
- This tool lets you apply SummerBoard themes. Themes are taken from /Library/Themes (or, now, the older SummerBoard folder). Right now the front-end for selecting themes is /very/ simplistic: I have spent only a couple days coding this and almost all of that time has been on the backend.
- 
- More work will be done on this package in the very near future to make it actually have an interface ;P.
- 
- WinterBoard is /much/ more powerful than SummerBoard and lets you theme almost any graphic on the system. You can even easily theme .artwork files without having to hack their contents. Instructions on how this works will be posted soon on the More Information page.
+ WinterBoard was designed to accept <a href="http://www.apptapp.com/summerboard/">SummerBoard</a> themes without modification but is <strong>much</strong> more powerful than its predecessor. With WinterBoard you can theme almost any graphic on the system. You can even easily modify .artwork files without having to hack their contents, all from the safety of your theme folder.
 Name: WinterBoard
+Depends: mobilesubstrate
 Provides: theme-manager
 Conflicts: com.modmyifone.winterboardicon
 Replaces: com.modmyifone.winterboardicon
 Author: Jay Freeman (saurik) <saurik@saurik.com>
-Homepage: http://cydia.saurik.com/winterboard.html
+Homepage: http://cydia.saurik.com/winterboard/
