@@ -22,4 +22,16 @@ elif [[ $1 == upgrade ]]; then
     fi
 fi
 
+if [[ $1 == install || $1 == upgrade ]]; then
+    {
+        grep -v ' com\.saurik\.winterboard\.' /etc/notify.conf
+        cat <<EOF
+reserve com.saurik.winterboard. 0 0 rwr-r-
+monitor com.saurik.winterboard.lockbackground /var/mobile/Library/LockBackground.jpg
+EOF
+    } >/etc/notify.conf_ &&
+        mv -f /etc/notify.conf{_,} || rm -f /etc/notify.conf_
+    killall -1 notifyd
+fi
+
 exit 0

@@ -10,10 +10,10 @@ clean:
 	rm -f WinterBoard WinterBoard.dylib UIImages
 
 WinterBoard.dylib: Library.mm makefile
-	$(target)g++ -dynamiclib -g0 -O2 -Wall -Werror -o $@ $(filter %.mm,$^) -framework UIKit -framework CoreFoundation -framework Foundation -lobjc -init _WBInitialize -I/apl/inc/iPhoneOS-2.0 -framework CoreGraphics -framework MediaPlayer
+	$(target)g++ -dynamiclib -g0 -O2 -Wall -o $@ $(filter %.mm,$^) -framework CoreFoundation -framework Foundation -lobjc -init _WBInitialize -I/apl/inc/iPhoneOS-2.0 -framework CoreGraphics
 
 UIImages: UIImages.mm makefile
-	$(target)g++ -g0 -O2 -Wall -Werror -o $@ $(filter %.mm,$^) -framework UIKit -framework Foundation -framework CoreFoundation -lobjc
+	$(target)g++ -g0 -O2 -Wall -Werror -o $@ $(filter %.mm,$^) -framework UIKit -framework Foundation -framework CoreFoundation -lobjc -I/apl/inc/iPhoneOS-2.0
 
 WinterBoard: Application.mm makefile
 	$(target)g++ -g0 -O2 -Wall -Werror -o $@ $(filter %.mm,$^) -framework UIKit -framework Foundation -framework CoreFoundation -lobjc -framework CoreGraphics
@@ -29,6 +29,6 @@ package:
 	find winterboard/Library/Themes -name .svn | while read -r line; do rm -rf "$${line}"; done
 	cp -a control preinst prerm winterboard/DEBIAN
 	cp -a Test.sh icon.png WinterBoard.dylib WinterBoard UIImages Info.plist winterboard/Applications/WinterBoard.app
-	dpkg-deb -b winterboard winterboard_0.9.2520-2_iphoneos-arm.deb
+	dpkg-deb -b winterboard winterboard_0.9.2526-1_iphoneos-arm.deb
 
 .PHONY: all clean package

@@ -1,10 +1,14 @@
 #import <Foundation/Foundation.h>
 #import <CoreGraphics/CoreGraphics.h>
-#import <UIKit/UIKit.h>
+
+#import <UIKit/UIKeyboard.h>
+#import <UIKit/UIImage.h>
 
 extern "C" {
     #include <mach-o/nlist.h>
 }
+
+extern "C" NSData *UIImagePNGRepresentation(UIImage *image);
 
 int main(int argc, char *argv[]) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -18,6 +22,7 @@ int main(int argc, char *argv[]) {
     void (*__UISharedImageInitialize)(bool) = (void (*)(bool)) nl[1].n_value;
 
     __UISharedImageInitialize(false);
+    [UIKeyboard preheatArtwork];
 
     NSArray *keys = [*images allKeys];
     for (int i(0), e([keys count]); i != e; ++i) {

@@ -30,14 +30,23 @@
         }
     </style>
 </head><body style="color: black">
-    <img src="Rock.png" id="rock"/>
-    <img src="Plant.png" id="plant"/>
+    <img id="one"/>
+    <img id="two"/>
 
     <script>
-        var fade_in = rock;
-        var fade_out = plant;
+        var images = ['Rock.png', 'Plant.png'];
+        var index = 0;
+
+        var fade_in = one;
+        var fade_out = two;
+
+        fade_in.src = images[0];
+        fade_out.src = images[images.length - 1];
 
         var fade = function () {
+            fade_in.src = images[index];
+            index = (index + 1) % images.length;
+
             fade_in.className = 'fade-out';
             fade_out.className = 'fade-in';
 

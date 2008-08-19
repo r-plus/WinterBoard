@@ -3,10 +3,10 @@
 <plist version="1.0"><dict>
 
 <!--key>StatusBarMode</key>
-<string>0</string>
-
-<key>StatusBarContentsMode</key>
 <string>0</string-->
+
+<key>NavigationBarStyle-0</key>
+<string>1</string>
 
 <key>UndockedIconLabelStyle</key>
 <string>/*font-family: monospace; font-size: 13px;*/ color: white</string>
