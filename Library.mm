@@ -76,10 +76,12 @@ extern "C" {
 #import <SpringBoard/SBApplication.h>
 #import <SpringBoard/SBApplicationIcon.h>
 #import <SpringBoard/SBAppWindow.h>
+#import <SpringBoard/SBBookmarkIcon.h>
 #import <SpringBoard/SBButtonBar.h>
 #import <SpringBoard/SBContentLayer.h>
 #import <SpringBoard/SBIconController.h>
 #import <SpringBoard/SBIconLabel.h>
+#import <SpringBoard/SBSlidingAlertDisplay.h>
 #import <SpringBoard/SBStatusBarContentsView.h>
 #import <SpringBoard/SBStatusBarController.h>
 #import <SpringBoard/SBStatusBarTimeView.h>
@@ -123,7 +125,7 @@ Class $UIWebDocumentView;
 @end
 
 bool Debug_ = false;
-bool Engineer_ = false;
+bool Engineer_ = true;
 
 /* WinterBoard Backend {{{ */
 #define WBPrefix "wb_"
@@ -176,6 +178,9 @@ void WBRename(bool instance, const char *classname, const char *oldname, IMP new
 /* }}} */
 
 @protocol WinterBoard
+- (void) wb_updateDesktopImage:(UIImage *)image;
+- (UIImage *) wb_defaultDesktopImage;
+- (NSString *) wb_bundlePath;
 - (NSString *) wb_pathForIcon;
 - (NSString *) wb_pathForResource:(NSString *)resource ofType:(NSString *)type;
 - (id) wb_init;
@@ -200,19 +205,33 @@ void WBRename(bool instance, const char *classname, const char *oldname, IMP new
 - (void) wb_appendIconList:(SBIconList *)list;
 - (id) wb_initWithStatusBar:(id)bar mode:(int)mode;
 - (id) wb_initWithMode:(int)mode orientation:(int)orientation;
+- (id) wb_imageAtPath:(NSString *)path;
+- (id) wb_initWithContentsOfFile:(NSString *)file;
+- (id) wb_initWithContentsOfFile:(NSString *)file cache:(BOOL)cache;
 - (void) wb_setStatusBarMode:(int)mode orientation:(int)orientation duration:(float)duration fenceID:(int)id animation:(int)animation;
 @end
 
-NSMutableDictionary **__mappedImages;
-NSMutableDictionary *UIImages_;
-NSMutableDictionary *PathImages_;
+static NSMutableDictionary **__mappedImages;
+static NSMutableDictionary *UIImages_;
+static NSMutableDictionary *PathImages_;
 
-NSFileManager *Manager_;
-NSDictionary *English_;
-NSMutableDictionary *Info_;
-NSMutableArray *themes_;
+static NSFileManager *Manager_;
+static NSDictionary *English_;
+static NSMutableDictionary *Info_;
+static NSMutableArray *themes_;
 
-NSString *$pathForIcon$(SBApplication<WinterBoard> *self) {
+static NSString *$getTheme$(NSArray *files) {
+    for (NSString *theme in themes_)
+        for (NSString *file in files) {
+            NSString *path([NSString stringWithFormat:@"%@/%@", theme, file]);
+            if ([Manager_ fileExistsAtPath:path])
+                return path;
+        }
+
+    return nil;
+}
+
+static NSString *$pathForIcon$(SBApplication<WinterBoard> *self) {
     for (NSString *theme in themes_) {
         NSString *identifier = [self bundleIdentifier];
         NSString *folder = [[self path] lastPathComponent];
@@ -264,13 +283,21 @@ static UIImage *SBApplicationIcon$icon(SBApplicationIcon<WinterBoard> *self, SEL
     return [self wb_icon];
 }
 
+static UIImage *SBBookmarkIcon$icon(SBBookmarkIcon<WinterBoard> *self, SEL sel) {
+    if (Debug_)
+        NSLog(@"WB:Debug:Bookmark(%@:%@)", [self displayIdentifier], [self displayName]);
+    if (NSString *path = $getTheme$([NSArray arrayWithObject:[NSString stringWithFormat:@"Icons/%@.png", [self displayName]]]))
+        return [$UIImage imageWithContentsOfFile:path];
+    return [self wb_icon];
+}
+
 static NSString *SBApplication$pathForIcon(SBApplication<WinterBoard> *self, SEL sel) {
     if (NSString *path = $pathForIcon$(self))
         return path;
     return [self wb_pathForIcon];
 }
 
-static NSString *$pathForFile$inBundle$(NSString *file, NSBundle *bundle, bool ui) {
+static NSString *$pathForFile$inBundle$(NSString *file, NSBundle<WinterBoard> *bundle, bool ui) {
     for (NSString *theme in themes_) {
         NSString *identifier = [bundle bundleIdentifier];
 
@@ -280,7 +307,7 @@ static NSString *$pathForFile$inBundle$(NSString *file, NSBundle *bundle, bool u
                 return path;
         }
 
-        if (NSString *folder = [[bundle bundlePath] lastPathComponent]) {
+        if (NSString *folder = [[bundle wb_bundlePath] lastPathComponent]) {
             NSString *path = [NSString stringWithFormat:@"%@/Folders/%@/%@", theme, folder, file];
             if ([Manager_ fileExistsAtPath:path])
                 return path;
@@ -312,7 +339,7 @@ static UIImage *CachedImageAtPath(NSString *path) {
     UIImage *image = [PathImages_ objectForKey:path];
     if (image != nil)
         return reinterpret_cast<id>(image) == [NSNull null] ? nil : image;
-    image = [[$UIImage alloc] initWithContentsOfFile:path cache:true];
+    image = [[$UIImage alloc] wb_initWithContentsOfFile:path cache:true];
     if (image != nil)
         image = [image autorelease];
     [PathImages_ setObject:(image == nil ? [NSNull null] : reinterpret_cast<id>(image)) forKey:path];
@@ -347,6 +374,115 @@ static UIImage *UIImage$applicationImageNamed$(Class<WinterBoard> self, SEL sel,
     return [self wb_applicationImageNamed:name];
 }
 
+@interface NSString (WinterBoard)
+- (NSString *) wb_themedPath;
+@end
+
+@implementation NSString (WinterBoard)
+
+- (NSString *) wb_themedPath {
+    NSLog(@"WB:Debug:Bypass(\"%@\")", self);
+    return self;
+}
+
+@end
+
+static NSMutableDictionary *Files_;
+
+#define WBDelegate(delegate) \
+    - (NSMethodSignature*) methodSignatureForSelector:(SEL)sel { \
+        if (Engineer_) \
+            NSLog(@"WB:MS:%s:(%s)", class_getName([self class]), sel_getName(sel)); \
+        if (NSMethodSignature *sig = [delegate methodSignatureForSelector:sel]) \
+            return sig; \
+        NSLog(@"WB:Error: [%s methodSignatureForSelector:(%s)]", class_getName([self class]), sel_getName(sel)); \
+        return nil; \
+    } \
+\
+    - (void) forwardInvocation:(NSInvocation*)inv { \
+        SEL sel = [inv selector]; \
+        if ([delegate respondsToSelector:sel]) \
+            [inv invokeWithTarget:delegate]; \
+        else \
+            NSLog(@"WB:Error: [%s forwardInvocation:(%s)]", class_getName([self class]), sel_getName(sel)); \
+    }
+
+/*@interface WBBundlePath : NSProxy {
+    NSBundle<WinterBoard> *bundle_;
+    NSString *path_;
+}
+
+- (id) initWithBundle:(NSBundle *)bundle path:(NSString *)path;
+
+- (NSString *) wb_themedPath;
+
+@end
+
+@implementation WBBundlePath
+
+- (void) dealloc {
+    [bundle_ release];
+    [path_ release];
+    [super dealloc];
+}
+
+- (id) initWithBundle:(NSBundle *)bundle path:(NSString *)path {
+    bundle_ = [bundle retain];
+    path_ = [path retain];
+    return self;
+}
+
+WBDelegate(path_)
+
+- (NSString *) stringByAppendingPathComponent:(NSString *)component {
+    NSLog(@"WB:Debug:app:%@:%@", path_, component);
+    return [[[WBBundlePath alloc] initWithBundle:bundle_ path:[path_ stringByAppendingPathComponent:component]] autorelease];
+}
+
+- (NSString *) stringByAppendingPathExtension:(NSString *)extension {
+    return [[[WBBundlePath alloc] initWithBundle:bundle_ path:[path_ stringByAppendingPathExtension:extension]] autorelease];
+}
+
+- (const char *) UTF8String {
+    const char *string = [path_ UTF8String];
+    NSLog(@"WB:Debug:UTF=%s", string);
+    return string;
+}
+
+- (NSString *) description {
+    return [path_ description];
+}
+
+- (NSString *) wb_themedPath {
+    return path_;
+    NSString *path = [Files_ objectForKey:path_];
+    if (path == nil) {
+        NSString *path = [bundle_ wb_bundlePath];
+        if (![path_ hasPrefix:path]) {
+            NSLog(@"WB:Error:![@\"%@\" hasPrefix:@\"%@\"]", path_, path);
+            return path_;
+        }
+        path = [path_ substringFromIndex:([path length] + 1)];
+        path = $pathForFile$inBundle$(path, bundle_, false);
+        if (path == nil)
+            path = reinterpret_cast<NSString *>([NSNull null]);
+        [Files_ setObject:path forKey:path_];
+        if (Debug_)
+            NSLog(@"WB:Debug:ThemePath(\"%@\")->\"%@\"", path_, path);
+    }
+    if (reinterpret_cast<id>(path) == [NSNull null])
+        path = path_;
+    NSLog(@"WB:Debug:ThemePath=%@", path);
+    return path;
+}
+
+@end*/
+
+static NSString *NSBundle$bundlePath$(NSBundle<WinterBoard> *self, SEL sel) {
+    //return [[WBBundlePath alloc] initWithBundle:self path:[self wb_bundlePath]];
+    return [self wb_bundlePath];
+}
+
 static NSString *NSBundle$pathForResource$ofType$(NSBundle<WinterBoard> *self, SEL sel, NSString *resource, NSString *type) {
     NSString *file = type == nil ? resource : [NSString stringWithFormat:@"%@.%@", resource, type];
     if (Debug_)
@@ -356,7 +492,7 @@ static NSString *NSBundle$pathForResource$ofType$(NSBundle<WinterBoard> *self, S
     return [self wb_pathForResource:resource ofType:type];
 }
 
-bool $setBarStyle$_(NSString *name, UIView<WinterBoard> *self, int style) {
+static bool $setBarStyle$_(NSString *name, UIView<WinterBoard> *self, int style) {
     if (Debug_)
         NSLog(@"WB:Debug:%@Style:%d", name, style);
     NSNumber *number = nil;
@@ -375,7 +511,7 @@ bool $setBarStyle$_(NSString *name, UIView<WinterBoard> *self, int style) {
     }
 }
 
-/*id UINavigationBarBackground$initWithFrame$withBarStyle$withTintColor$(UINavigationBarBackground<WinterBoard> *self, SEL sel, CGRect frame, int style, UIColor *tint) {
+/*static id UINavigationBarBackground$initWithFrame$withBarStyle$withTintColor$(UINavigationBarBackground<WinterBoard> *self, SEL sel, CGRect frame, int style, UIColor *tint) {
     _trace();
 
     if (NSNumber *number = [Info_ objectForKey:@"NavigationBarStyle"])
@@ -387,7 +523,7 @@ bool $setBarStyle$_(NSString *name, UIView<WinterBoard> *self, int style) {
     return [self wb_initWithFrame:frame withBarStyle:style withTintColor:tint];
 }*/
 
-/*id UINavigationBar$initWithCoder$(SBAppWindow<WinterBoard> *self, SEL sel, CGRect frame, NSCoder *coder) {
+/*static id UINavigationBar$initWithCoder$(SBAppWindow<WinterBoard> *self, SEL sel, CGRect frame, NSCoder *coder) {
     self = [self wb_initWithCoder:coder];
     if (self == nil)
         return nil;
@@ -395,7 +531,7 @@ bool $setBarStyle$_(NSString *name, UIView<WinterBoard> *self, int style) {
     return self;
 }
 
-id UINavigationBar$initWithFrame$(SBAppWindow<WinterBoard> *self, SEL sel, CGRect frame) {
+static id UINavigationBar$initWithFrame$(SBAppWindow<WinterBoard> *self, SEL sel, CGRect frame) {
     self = [self wb_initWithFrame:frame];
     if (self == nil)
         return nil;
@@ -420,18 +556,29 @@ static void $didMoveToSuperview(SBButtonBar<WinterBoard> *self, SEL sel) {
     [self wb_didMoveToSuperview];
 }
 
-static NSString *$getTheme$(NSArray *files) {
-    for (NSString *theme in themes_)
-        for (NSString *file in files) {
-            NSString *path([NSString stringWithFormat:@"%@/%@", theme, file]);
-            if ([Manager_ fileExistsAtPath:path])
-                return path;
-        }
-
-    return nil;
+static id UIImage$imageAtPath$(NSObject<WinterBoard> *self, SEL sel, NSString *path) {
+    return [self wb_imageAtPath:[path wb_themedPath]];
 }
 
-static UIImageView *Wallpaper_;
+static id $initWithContentsOfFile$(NSObject<WinterBoard> *self, SEL sel, NSString *file) {
+    return [self wb_initWithContentsOfFile:[file wb_themedPath]];
+}
+
+static id UIImage$initWithContentsOfFile$cache$(UIImage<WinterBoard> *self, SEL sel, NSString *file, BOOL cache) {
+    return [self wb_initWithContentsOfFile:[file wb_themedPath] cache:cache];
+}
+
+static UIImage *UIImage$defaultDesktopImage$(UIImage<WinterBoard> *self, SEL sel) {
+    if (Debug_)
+        NSLog(@"WB:Debug:DefaultDesktopImage");
+    if (NSString *path = $getTheme$([NSArray arrayWithObjects:@"LockBackground.png", @"LockBackground.jpg", nil]))
+        return [$UIImage imageWithContentsOfFile:path];
+    return [self wb_defaultDesktopImage];
+}
+
+static UIImageView *WallpaperImage_;
+static UIWebDocumentView *WallpaperPage_;
+static NSURL *WallpaperURL_;
 
 static id SBContentLayer$initWithSize$(SBContentLayer<WinterBoard> *self, SEL sel, CGSize size) {
     self = [self wb_initWithSize:size];
@@ -449,15 +596,15 @@ static id SBContentLayer$initWithSize$(SBContentLayer<WinterBoard> *self, SEL se
 
     UIImage *image;
     if (NSString *path = $getTheme$([NSArray arrayWithObjects:@"Wallpaper.png", @"Wallpaper.jpg", nil])) {
-        image = [[$UIImage alloc] initWithContentsOfFile:path];
+        image = [[$UIImage alloc] wb_initWithContentsOfFile:path];
         if (image != nil)
             image = [image autorelease];
     } else image = nil;
 
-    if (Wallpaper_ != nil)
-        [Wallpaper_ release];
-    Wallpaper_ = [[$UIImageView alloc] initWithImage:image];
-    [self addSubview:Wallpaper_];
+    if (WallpaperImage_ != nil)
+        [WallpaperImage_ release];
+    WallpaperImage_ = [[$UIImageView alloc] initWithImage:image];
+    [self addSubview:WallpaperImage_];
 
     if (NSString *path = $getTheme$([NSArray arrayWithObject:@"Wallpaper.html"])) {
         CGRect bounds = [self bounds];
@@ -465,7 +612,15 @@ static id SBContentLayer$initWithSize$(SBContentLayer<WinterBoard> *self, SEL se
         UIWebDocumentView *view([[[$UIWebDocumentView alloc] initWithFrame:bounds] autorelease]);
         [view setAutoresizes:true];
 
-        [view loadRequest:[NSURLRequest requestWithURL:[NSURL fileURLWithPath:path]]];
+        if (WallpaperPage_ != nil)
+            [WallpaperPage_ release];
+        WallpaperPage_ = [view retain];
+
+        if (WallpaperURL_ != nil)
+            [WallpaperURL_ release];
+        WallpaperURL_ = [[NSURL fileURLWithPath:path] retain];
+
+        [WallpaperPage_ loadRequest:[NSURLRequest requestWithURL:WallpaperURL_]];
 
         [[view webView] setDrawsBackground:false];
         [view setBackgroundColor:[$UIColor clearColor]];
@@ -476,23 +631,44 @@ static id SBContentLayer$initWithSize$(SBContentLayer<WinterBoard> *self, SEL se
     return self;
 }
 
-#define WBDelegate(delegate) \
-    - (NSMethodSignature*) methodSignatureForSelector:(SEL)sel { \
-        if (Engineer_) \
-            NSLog(@"WB:MS:%s:(%s)", class_getName([self class]), sel_getName(sel)); \
-        if (NSMethodSignature *sig = [delegate methodSignatureForSelector:sel]) \
-            return sig; \
-        NSLog(@"WB:Error: [%s methodSignatureForSelector:(%s)]", class_getName([self class]), sel_getName(sel)); \
-        return nil; \
-    } \
-\
-    - (void) forwardInvocation:(NSInvocation*)inv { \
-        SEL sel = [inv selector]; \
-        if ([delegate respondsToSelector:sel]) \
-            [inv invokeWithTarget:delegate]; \
-        else \
-            NSLog(@"WB:Error: [%s forwardInvocation:(%s)]", class_getName([self class]), sel_getName(sel)); \
+static void SBSlidingAlertDisplay$updateDesktopImage$(SBSlidingAlertDisplay<WinterBoard> *self, SEL sel, UIImage *image) {
+    NSString *path = $getTheme$([NSArray arrayWithObject:@"LockBackground.html"]);
+
+    if (path) {
+        UIView *background;
+        object_getInstanceVariable(self, "_backgroundView", reinterpret_cast<void **>(&background));
+        if (background != nil)
+            path = nil;
     }
+
+    [self wb_updateDesktopImage:image];
+
+    if (path != nil) {
+        CGRect bounds = [self bounds];
+
+        UIWebDocumentView *view([[[$UIWebDocumentView alloc] initWithFrame:bounds] autorelease]);
+        [view setAutoresizes:true];
+
+        if (WallpaperPage_ != nil)
+            [WallpaperPage_ release];
+        WallpaperPage_ = [view retain];
+
+        if (WallpaperURL_ != nil)
+            [WallpaperURL_ release];
+        WallpaperURL_ = [[NSURL fileURLWithPath:path] retain];
+
+        [WallpaperPage_ loadRequest:[NSURLRequest requestWithURL:WallpaperURL_]];
+
+        [[view webView] setDrawsBackground:false];
+        [view setBackgroundColor:[$UIColor clearColor]];
+
+        UIView *background;
+        object_getInstanceVariable(self, "_backgroundView", reinterpret_cast<void **>(&background));
+        NSLog(@"back:%@", background);
+
+        [self insertSubview:view aboveSubview:background];
+    }
+}
 
 static unsigned *__currentContextCount;
 static void ***__currentContextStack;
@@ -619,7 +795,7 @@ WBDelegate(string_)
 static void SBStatusBarController$setStatusBarMode$orientation$duration$fenceID$animation$(SBStatusBarController<WinterBoard> *self, SEL sel, int mode, int orientation, float duration, int id, int animation) {
     if (Debug_)
         NSLog(@"WB:Debug:setStatusBarMode:%d", mode);
-    if (mode != 104)
+    if (mode < 100) // 104:hidden 105:glowing
         if (NSNumber *number = [Info_ objectForKey:@"StatusBarMode"])
             mode = [number intValue];
     return [self wb_setStatusBarMode:mode orientation:orientation duration:duration fenceID:id animation:animation];
@@ -689,7 +865,7 @@ static UIImage *$_UIImageWithName(NSString *name) {
         if (image != nil)
             return reinterpret_cast<id>(image) == [NSNull null] ? nil : image;
         if (NSString *path = $pathForFile$inBundle$(name, _UIKitBundle(), true)) {
-            image = [[$UIImage alloc] initWithContentsOfFile:path];
+            image = [[$UIImage alloc] wb_initWithContentsOfFile:path];
             if (image != nil)
                 [image autorelease];
         }
@@ -802,13 +978,19 @@ static void ChangeWallpaper(
 ) {
     if (Debug_)
         NSLog(@"WB:Debug:ChangeWallpaper!");
+
     UIImage *image;
     if (NSString *path = $getTheme$([NSArray arrayWithObjects:@"Wallpaper.png", @"Wallpaper.jpg", nil])) {
-        image = [[$UIImage alloc] initWithContentsOfFile:path];
+        image = [[$UIImage alloc] wb_initWithContentsOfFile:path];
         if (image != nil)
             image = [image autorelease];
     } else image = nil;
-    [Wallpaper_ setImage:image];
+
+    if (WallpaperImage_ != nil)
+        [WallpaperImage_ setImage:image];
+    if (WallpaperPage_ != nil)
+        [WallpaperPage_ loadRequest:[NSURLRequest requestWithURL:WallpaperURL_]];
+
 }
 
 extern "C" void WBInitialize() {
@@ -867,6 +1049,39 @@ extern "C" void WBInitialize() {
         WBReplace(_Z24GetFileNameForThisActionmPcRb, &$_Z24GetFileNameForThisActionmPcRb, &_Z24GetFileNameForThisActionmPcRb);
     }
 
+    WBRename(false, "UIImage", "applicationImageNamed:", (IMP) &UIImage$applicationImageNamed$);
+    WBRename(false, "UIImage", "defaultDesktopImage", (IMP) &UIImage$defaultDesktopImage$);
+    WBRename(false, "UIImage", "imageAtPath:", (IMP) &UIImage$imageAtPath$);
+    WBRename(false, "UIImage", "imageNamed:", (IMP) &UIImage$imageNamed$);
+    WBRename(false, "UIImage", "imageNamed:inBundle:", (IMP) &UIImage$imageNamed$inBundle$);
+
+    //WBRename("UINavigationBar", "initWithCoder:", (IMP) &UINavigationBar$initWithCoder$);
+    //WBRename("UINavigationBarBackground", "initWithFrame:withBarStyle:withTintColor:", (IMP) &UINavigationBarBackground$initWithFrame$withBarStyle$withTintColor$);
+    //WBRename(true, "SBStatusBar", "initWithMode:orientation:", (IMP) &SBStatusBar$initWithMode$orientation$);
+    //WBRename(true, "UIWebDocumentView", "setViewportSize:forDocumentTypes:", (IMP) &UIWebDocumentView$setViewportSize$forDocumentTypes$);
+
+    WBRename(true, "NSBundle", "bundlePath", (IMP) &NSBundle$bundlePath$);
+    WBRename(true, "NSBundle", "pathForResource:ofType:", (IMP) &NSBundle$pathForResource$ofType$);
+
+    WBRename(true, "UIImage", "initWithContentsOfFile:", (IMP) &$initWithContentsOfFile$);
+    WBRename(true, "UIImage", "initWithContentsOfFile:cache:", (IMP) &UIImage$initWithContentsOfFile$cache$);
+    WBRename(true, "UINavigationBar", "setBarStyle:", (IMP) &UINavigationBar$setBarStyle$);
+    WBRename(true, "UIToolbar", "setBarStyle:", (IMP) &UIToolbar$setBarStyle$);
+
+    WBRename(true, "SBApplication", "pathForIcon", (IMP) &SBApplication$pathForIcon);
+    WBRename(true, "SBApplicationIcon", "icon", (IMP) &SBApplicationIcon$icon);
+    WBRename(true, "SBBookmarkIcon", "icon", (IMP) &SBBookmarkIcon$icon);
+    WBRename(true, "SBButtonBar", "didMoveToSuperview", (IMP) &$didMoveToSuperview);
+    WBRename(true, "SBContentLayer", "initWithSize:", (IMP) &SBContentLayer$initWithSize$);
+    WBRename(true, "SBIconLabel", "setInDock:", (IMP) &SBIconLabel$setInDock$);
+    WBRename(true, "SBIconLabel", "initWithSize:label:", (IMP) &SBIconLabel$initWithSize$label$);
+    WBRename(true, "SBSlidingAlertDisplay", "updateDesktopImage:", (IMP) &SBSlidingAlertDisplay$updateDesktopImage$);
+    WBRename(true, "SBStatusBarContentsView", "didMoveToSuperview", (IMP) &$didMoveToSuperview);
+    WBRename(true, "SBStatusBarContentsView", "initWithStatusBar:mode:", (IMP) &SBStatusBarContentsView$initWithStatusBar$mode$);
+    WBRename(true, "SBStatusBarController", "setStatusBarMode:orientation:duration:fenceID:animation:", (IMP) &SBStatusBarController$setStatusBarMode$orientation$duration$fenceID$animation$);
+    WBRename(true, "SBStatusBarTimeView", "drawRect:", (IMP) &SBStatusBarTimeView$drawRect$);
+    WBRename(true, "SBIconController", "appendIconList:", (IMP) &SBIconController$appendIconList$);
+
     _UISharedImageInitialize(false);
 
     English_ = [[NSDictionary alloc] initWithContentsOfFile:@"/System/Library/CoreServices/SpringBoard.app/English.lproj/LocalizedApplicationNames.strings"];
@@ -876,32 +1091,7 @@ extern "C" void WBInitialize() {
     Manager_ = [[NSFileManager defaultManager] retain];
     UIImages_ = [[NSMutableDictionary alloc] initWithCapacity:16];
     PathImages_ = [[NSMutableDictionary alloc] initWithCapacity:16];
-
-    WBRename(false, "UIImage", "applicationImageNamed:", (IMP) &UIImage$applicationImageNamed$);
-    WBRename(false, "UIImage", "imageNamed:", (IMP) &UIImage$imageNamed$);
-    WBRename(false, "UIImage", "imageNamed:inBundle:", (IMP) &UIImage$imageNamed$inBundle$);
-
-    //WBRename("UINavigationBar", "initWithCoder:", (IMP) &UINavigationBar$initWithCoder$);
-    //WBRename("UINavigationBarBackground", "initWithFrame:withBarStyle:withTintColor:", (IMP) &UINavigationBarBackground$initWithFrame$withBarStyle$withTintColor$);
-    //WBRename(true, "SBStatusBar", "initWithMode:orientation:", (IMP) &SBStatusBar$initWithMode$orientation$);
-    //WBRename(true, "UIWebDocumentView", "setViewportSize:forDocumentTypes:", (IMP) &UIWebDocumentView$setViewportSize$forDocumentTypes$);
-
-    WBRename(true, "NSBundle", "pathForResource:ofType:", (IMP) &NSBundle$pathForResource$ofType$);
-
-    WBRename(true, "UINavigationBar", "setBarStyle:", (IMP) &UINavigationBar$setBarStyle$);
-    WBRename(true, "UIToolbar", "setBarStyle:", (IMP) &UIToolbar$setBarStyle$);
-
-    WBRename(true, "SBApplication", "pathForIcon", (IMP) &SBApplication$pathForIcon);
-    WBRename(true, "SBApplicationIcon", "icon", (IMP) &SBApplicationIcon$icon);
-    WBRename(true, "SBButtonBar", "didMoveToSuperview", (IMP) &$didMoveToSuperview);
-    WBRename(true, "SBContentLayer", "initWithSize:", (IMP) &SBContentLayer$initWithSize$);
-    WBRename(true, "SBIconLabel", "setInDock:", (IMP) &SBIconLabel$setInDock$);
-    WBRename(true, "SBIconLabel", "initWithSize:label:", (IMP) &SBIconLabel$initWithSize$label$);
-    WBRename(true, "SBStatusBarContentsView", "didMoveToSuperview", (IMP) &$didMoveToSuperview);
-    WBRename(true, "SBStatusBarContentsView", "initWithStatusBar:mode:", (IMP) &SBStatusBarContentsView$initWithStatusBar$mode$);
-    WBRename(true, "SBStatusBarController", "setStatusBarMode:orientation:duration:fenceID:animation:", (IMP) &SBStatusBarController$setStatusBarMode$orientation$duration$fenceID$animation$);
-    WBRename(true, "SBStatusBarTimeView", "drawRect:", (IMP) &SBStatusBarTimeView$drawRect$);
-    WBRename(true, "SBIconController", "appendIconList:", (IMP) &SBIconController$appendIconList$);
+    Files_ = [[NSMutableDictionary alloc] initWithCapacity:16];
 
     themes_ = [[NSMutableArray alloc] initWithCapacity:8];
 
