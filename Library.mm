@@ -129,6 +129,8 @@ void WBInject(const char *classname, const char *oldname, IMP newimp, const char
 /* }}} */
 
 @protocol WinterBoard
+- (CGSize) wb_renderedSizeOfNode:(id)node constrainedToWidth:(float)width;
+- (void *) _node;
 - (void) wb_updateDesktopImage:(UIImage *)image;
 - (UIImage *) wb_defaultDesktopImage;
 - (NSString *) wb_bundlePath;
@@ -786,6 +788,16 @@ static void SBIconLabel$setInDock$(SBIconLabel<WinterBoard> *self, SEL sel, BOOL
     return [self wb_setInDock:docked];
 }
 
+@class WebCoreFrameBridge;
+static CGSize WebCoreFrameBridge$renderedSizeOfNode$constrainedToWidth$(WebCoreFrameBridge<WinterBoard> *self, SEL sel, id node, float width) {
+    if (node == nil)
+        return CGSizeZero;
+    void **core(reinterpret_cast<void **>([node _node]));
+    if (core == NULL || core[6] == NULL)
+        return CGSizeZero;
+    return [self wb_renderedSizeOfNode:node constrainedToWidth:width];
+}
+
 static void SBIconLabel$drawRect$(SBIconLabel<WinterBoard> *self, SEL sel, CGRect rect) {
     CGRect bounds = [self bounds];
 
@@ -1018,6 +1030,8 @@ extern "C" void WBInitialize() {
     WBRename(true, "UIImage", @selector(initWithContentsOfFile:cache:), (IMP) &UIImage$initWithContentsOfFile$cache$);
     WBRename(true, "UINavigationBar", @selector(setBarStyle:), (IMP) &UINavigationBar$setBarStyle$);
     WBRename(true, "UIToolbar", @selector(setBarStyle:), (IMP) &UIToolbar$setBarStyle$);
+
+    WBRename(true, "WebCoreFrameBridge", @selector(renderedSizeOfNode:constrainedToWidth:), (IMP) &WebCoreFrameBridge$renderedSizeOfNode$constrainedToWidth$);
 
     WBRename(true, "SBApplication", @selector(pathForIcon), (IMP) &SBApplication$pathForIcon);
     WBRename(true, "SBApplicationIcon", @selector(icon), (IMP) &SBApplicationIcon$icon);
