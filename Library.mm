@@ -500,12 +500,12 @@ static void SBCalendarIconContentsView$drawRect$(SBCalendarIconContentsView<Wint
     if (NSString *style = [Info_ objectForKey:@"CalendarIconDayStyle"])
         daystyle = [daystyle stringByAppendingString:style];
 
-    float width([self bounds].size.width + 1);
+    float width([self bounds].size.width);
     CGSize datesize = [(NSString *)date sizeWithStyle:datestyle forWidth:width];
     CGSize daysize = [(NSString *)day sizeWithStyle:daystyle forWidth:width];
 
     [(NSString *)date drawAtPoint:CGPointMake(
-        (width - daysize.width) / 2, (71 - daysize.height) / 2
+        (width + 4 - datesize.width) / 2, (71 - datesize.height) / 2
     ) withStyle:datestyle];
 
     [(NSString *)day drawAtPoint:CGPointMake(
@@ -736,67 +736,6 @@ WBDelegate(time_)
 
 @end
 
-@implementation WBIconLabel
-
-- (void) dealloc {
-    [string_ release];
-    [super dealloc];
-}
-
-- (id) initWithString:(NSString *)string {
-    string_ = [string retain];
-    return self;
-}
-
-WBDelegate(string_)
-
-- (NSString *) _iconLabelStyle {
-    NSString *key = docked_ ? @"DockedIconLabelStyle" : @"UndockedIconLabelStyle";
-    NSString *style = [Info_ objectForKey:key];
-    return style;
-}
-
-- (CGSize) drawInRect:(CGRect)rect withFont:(UIFont *)font lineBreakMode:(int)mode alignment:(int)alignment {
-    if (NSString *custom = [self _iconLabelStyle]) {
-        NSString *style = [NSString stringWithFormat:@""
-            "font-family: Helvetica; "
-            "font-weight: bold; "
-            "font-size: 11px; "
-            "text-align: center; "
-            "color: %@; "
-        "%@", docked_ ? @"white" : @"#b3b3b3", custom];
-
-        if (Debug_)
-            NSLog(@"WB:Debug:style = %@", style);
-        [string_ drawInRect:rect withStyle:style];
-        return CGSizeZero;
-    }
-
-    return [string_ drawInRect:rect withFont:font lineBreakMode:mode alignment:alignment];
-}
-
-- (void) drawInRect:(CGRect)rect withStyle:(NSString *)style {
-    if (NSString *custom = [self _iconLabelStyle]) {
-        NSString *combined = [NSString stringWithFormat:@"%@; %@", style, custom];
-        if (Debug_)
-            NSLog(@"WB:Debug:combined = %@", combined);
-        return [string_ drawInRect:rect withStyle:combined];
-    }
-    return [string_ drawInRect:rect withStyle:style];
-}
-
-- (BOOL) respondsToSelector:(SEL)sel {
-    return
-        sel == @selector(setInDock:)
-    ? true : [super respondsToSelector:sel];
-}
-
-- (void) setInDock:(BOOL)docked {
-    docked_ = docked;
-}
-
-@end
-
 static void SBStatusBarController$setStatusBarMode$orientation$duration$fenceID$animation$(SBStatusBarController<WinterBoard> *self, SEL sel, int mode, int orientation, float duration, int id, int animation) {
     if (Debug_)
         NSLog(@"WB:Debug:setStatusBarMode:%d", mode);
@@ -830,6 +769,13 @@ static void SBIconController$appendIconList$(SBIconController<WinterBoard> *self
     return [self wb_appendIconList:list];
 }
 
+static id SBIconLabel$initWithSize$label$(SBIconLabel<WinterBoard> *self, SEL sel, CGSize size, NSString *label) {
+    self = [self wb_initWithSize:size label:label];
+    if (self != nil)
+        [self setClipsToBounds:NO];
+    return self;
+}
+
 static void SBIconLabel$setInDock$(SBIconLabel<WinterBoard> *self, SEL sel, BOOL docked) {
     id label;
     object_getInstanceVariable(self, "_label", reinterpret_cast<void **>(&label));
@@ -840,14 +786,33 @@ static void SBIconLabel$setInDock$(SBIconLabel<WinterBoard> *self, SEL sel, BOOL
     return [self wb_setInDock:docked];
 }
 
-/*static id SBIconLabel$drawRect$(SBIconLabel<WinterBoard> *self, SEL sel, CGRect rect) {
-    
-}*/
+static void SBIconLabel$drawRect$(SBIconLabel<WinterBoard> *self, SEL sel, CGRect rect) {
+    CGRect bounds = [self bounds];
 
-static id SBIconLabel$initWithSize$label$(SBIconLabel<WinterBoard> *self, SEL sel, CGSize size, NSString *label) {
-    // XXX: technically I'm misusing self here
-    return [self wb_initWithSize:size label:[[[WBIconLabel alloc] initWithString:label] autorelease]];
-    //return [self wb_initWithSize:size label:label];
+    BOOL docked;
+    object_getInstanceVariable(self, "_inDock", reinterpret_cast<void **>(&docked));
+    docked = (docked & 0x1) != 0;
+
+    NSString *label;
+    object_getInstanceVariable(self, "_label", reinterpret_cast<void **>(&label));
+
+    NSString *style = [NSString stringWithFormat:@""
+        "font-family: Helvetica; "
+        "font-weight: bold; "
+        "font-size: 11px; "
+        "color: %@; "
+    "", docked ? @"white" : @"#b3b3b3"];
+
+    if (docked)
+        style = [style stringByAppendingString:@"text-shadow: rgba(0, 0, 0, 0.5) 0px -1px 0px; "];
+    float max = 75, width = [label sizeWithStyle:style forWidth:320].width;
+    if (width > max)
+        style = [style stringByAppendingString:[NSString stringWithFormat:@"letter-spacing: -%f; ", ((width - max) / ([label length] - 1))]];
+    if (NSString *custom = [Info_ objectForKey:(docked ? @"DockedIconLabelStyle" : @"UndockedIconLabelStyle")])
+        style = [style stringByAppendingString:custom];
+
+    CGSize size = [label sizeWithStyle:style forWidth:bounds.size.width];
+    [label drawAtPoint:CGPointMake((bounds.size.width - size.width) / 2, 0) withStyle:style];
 }
 
 extern "C" void FindMappedImages(void);
@@ -1060,9 +1025,9 @@ extern "C" void WBInitialize() {
     WBRename(true, "SBButtonBar", @selector(didMoveToSuperview), (IMP) &$didMoveToSuperview);
     WBRename(true, "SBCalendarIconContentsView", @selector(drawRect:), (IMP) &SBCalendarIconContentsView$drawRect$);
     WBRename(true, "SBContentLayer", @selector(initWithSize:), (IMP) &SBContentLayer$initWithSize$);
-    WBRename(true, "SBIconLabel", @selector(setInDock:), (IMP) &SBIconLabel$setInDock$);
-    //WBRename(true, "SBIconLabel", @selector(drawRect:), (IMP) &SBIconLabel$drawRect$);
     WBRename(true, "SBIconLabel", @selector(initWithSize:label:), (IMP) &SBIconLabel$initWithSize$label$);
+    WBRename(true, "SBIconLabel", @selector(setInDock:), (IMP) &SBIconLabel$setInDock$);
+    WBRename(true, "SBIconLabel", @selector(drawRect:), (IMP) &SBIconLabel$drawRect$);
     WBRename(true, "SBSlidingAlertDisplay", @selector(updateDesktopImage:), (IMP) &SBSlidingAlertDisplay$updateDesktopImage$);
     WBRename(true, "SBStatusBarContentsView", @selector(didMoveToSuperview), (IMP) &$didMoveToSuperview);
     WBRename(true, "SBStatusBarContentsView", @selector(initWithStatusBar:mode:), (IMP) &SBStatusBarContentsView$initWithStatusBar$mode$);
