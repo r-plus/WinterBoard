@@ -801,9 +801,11 @@ static CGSize WebCoreFrameBridge$renderedSizeOfNode$constrainedToWidth$(WebCoreF
 static void SBIconLabel$drawRect$(SBIconLabel<WinterBoard> *self, SEL sel, CGRect rect) {
     CGRect bounds = [self bounds];
 
+    static Ivar drawMoreLegibly = object_getInstanceVariable(self, "_drawMoreLegibly", NULL);
+
     BOOL docked;
-    object_getInstanceVariable(self, "_inDock", reinterpret_cast<void **>(&docked));
-    docked = (docked & 0x1) != 0;
+    Ivar ivar = object_getInstanceVariable(self, "_inDock", reinterpret_cast<void **>(&docked));
+    docked = (docked & (ivar_getOffset(ivar) == ivar_getOffset(drawMoreLegibly) ? 0x2 : 0x1)) != 0;
 
     NSString *label;
     object_getInstanceVariable(self, "_label", reinterpret_cast<void **>(&label));
