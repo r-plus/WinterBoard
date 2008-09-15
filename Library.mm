@@ -526,7 +526,7 @@ static void SBCalendarIconContentsView$drawRect$(SBCalendarIconContentsView<Wint
     CGSize daysize = [(NSString *)day sizeWithStyle:daystyle forWidth:width];
 
     [(NSString *)date drawAtPoint:CGPointMake(
-        (width + 4 - datesize.width) / 2, (71 - datesize.height) / 2
+        (width - datesize.width) / 2, (71 - datesize.height) / 2
     ) withStyle:datestyle];
 
     [(NSString *)day drawAtPoint:CGPointMake(
