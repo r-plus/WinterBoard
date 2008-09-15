@@ -129,6 +129,7 @@ void WBInject(const char *classname, const char *oldname, IMP newimp, const char
 /* }}} */
 
 @protocol WinterBoard
+- (NSString *) wb_localizedStringForKey:(NSString *)key value:(NSString *)value table:(NSString *)table;
 - (id) wb_initWithBadge:(id)badge;
 - (void) wb_cacheImageForIcon:(SBIcon *)icon;
 - (UIImage *) wb_getCachedImagedForIcon:(SBIcon *)icon;
@@ -851,6 +852,33 @@ static void SBIconLabel$setInDock$(SBIconLabel<WinterBoard> *self, SEL sel, BOOL
     return [self wb_setInDock:docked];
 }
 
+static NSMutableDictionary *Strings_;
+
+static NSString *NSBundle$localizedStringForKey$value$table$(NSBundle<WinterBoard> *self, SEL sel, NSString *key, NSString *value, NSString *table) {
+    NSString *identifier = [self bundleIdentifier];
+    NSLocale *locale = [NSLocale currentLocale];
+    NSString *language = [locale objectForKey:NSLocaleLanguageCode];
+    //if (Debug_)
+        NSLog(@"WB:Debug:[NSBundle(%@) localizedStringForKey:\"%@\" value:\"%@\" table:\"%@\"] (%@)", identifier, key, value, table, language);
+    NSString *file = table == nil ? @"Localizable" : table;
+    NSString *name = [NSString stringWithFormat:@"%@:%@", identifier, file];
+    NSDictionary *strings;
+    if ((strings = [Strings_ objectForKey:name]) != nil) {
+        if (static_cast<id>(strings) != [NSNull null]) strings:
+            if (NSString *value = [strings objectForKey:key])
+                return value;
+    } else if (NSString *path = $pathForFile$inBundle$([NSString stringWithFormat:@"%@.lproj/%@.strings",
+        language, file
+    ], self, false)) {
+        if ((strings = [[NSDictionary alloc] initWithContentsOfFile:path]) != nil) {
+            [Strings_ setObject:[strings autorelease] forKey:name];
+            goto strings;
+        } else goto null;
+    } else null:
+        [Strings_ setObject:[NSNull null] forKey:name];
+    return [self wb_localizedStringForKey:key value:value table:table];
+}
+
 @class WebCoreFrameBridge;
 static CGSize WebCoreFrameBridge$renderedSizeOfNode$constrainedToWidth$(WebCoreFrameBridge<WinterBoard> *self, SEL sel, id node, float width) {
     if (node == nil)
@@ -1089,6 +1117,7 @@ extern "C" void WBInitialize() {
     //WBRename(true, "UIWebDocumentView", @selector(setViewportSize:forDocumentTypes:", (IMP) &UIWebDocumentView$setViewportSize$forDocumentTypes$);
 
     WBRename(true, "NSBundle", @selector(bundlePath), (IMP) &NSBundle$bundlePath$);
+    WBRename(true, "NSBundle", @selector(localizedStringForKey:value:table:), (IMP) &NSBundle$localizedStringForKey$value$table$);
     WBRename(true, "NSBundle", @selector(pathForResource:ofType:), (IMP) &NSBundle$pathForResource$ofType$);
 
     WBRename(true, "UIImage", @selector(initWithContentsOfFile:), (IMP) &$initWithContentsOfFile$);
@@ -1129,6 +1158,7 @@ extern "C" void WBInitialize() {
     PathImages_ = [[NSMutableDictionary alloc] initWithCapacity:16];
     Files_ = [[NSMutableDictionary alloc] initWithCapacity:16];
     Cache_ = [[NSMutableDictionary alloc] initWithCapacity:64];
+    Strings_ = [[NSMutableDictionary alloc] initWithCapacity:0];
 
     themes_ = [[NSMutableArray alloc] initWithCapacity:8];
 
