@@ -6,7 +6,7 @@ Architecture: iphoneos-arm
 Version: 0.9.2564-1
 Description: more powerful, open-source SummerBoard
 Name: WinterBoard
-Depends: mobilesubstrate (>= 0.9.2560-1)
+Depends: mobilesubstrate (>= 0.9.2568-1)
 Provides: theme-manager
 Conflicts: com.modmyifone.winterboardicon
 Replaces: com.modmyifone.winterboardicon

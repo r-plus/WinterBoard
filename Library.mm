@@ -129,6 +129,8 @@ void WBInject(const char *classname, const char *oldname, IMP newimp, const char
 /* }}} */
 
 @protocol WinterBoard
+- (void) wb_cacheImageForIcon:(SBIcon *)icon;
+- (UIImage *) wb_getCachedImagedForIcon:(SBIcon *)icon;
 - (CGSize) wb_renderedSizeOfNode:(id)node constrainedToWidth:(float)width;
 - (void *) _node;
 - (void) wb_updateDesktopImage:(UIImage *)image;
@@ -227,6 +229,23 @@ static NSString *$pathForIcon$(SBApplication<WinterBoard> *self) {
     }
 
     return nil;
+}
+
+static NSMutableDictionary *Cache_;
+
+static void SBIconModel$cacheImageForIcon$(SBIconModel<WinterBoard> *self, SEL sel, SBIcon *icon) {
+    [self wb_cacheImageForIcon:icon];
+    NSString *key([icon displayIdentifier]);
+    if (UIImage *value = [icon icon])
+        [Cache_ setObject:value forKey:key];
+}
+
+static UIImage *SBIconModel$getCachedImagedForIcon$(SBIconModel<WinterBoard> *self, SEL sel, SBIcon *icon) {
+    NSString *key([icon displayIdentifier]);
+    if (UIImage *image = [Cache_ objectForKey:key])
+        return image;
+    else
+        return [self wb_getCachedImagedForIcon:icon];
 }
 
 static UIImage *SBApplicationIcon$icon(SBApplicationIcon<WinterBoard> *self, SEL sel) {
@@ -1035,6 +1054,9 @@ extern "C" void WBInitialize() {
 
     WBRename(true, "WebCoreFrameBridge", @selector(renderedSizeOfNode:constrainedToWidth:), (IMP) &WebCoreFrameBridge$renderedSizeOfNode$constrainedToWidth$);
 
+    WBRename(true, "SBIconModel", @selector(cacheImageForIcon:), (IMP) &SBIconModel$cacheImageForIcon$);
+    WBRename(true, "SBIconModel", @selector(getCachedImagedForIcon:), (IMP) &SBIconModel$getCachedImagedForIcon$);
+
     WBRename(true, "SBApplication", @selector(pathForIcon), (IMP) &SBApplication$pathForIcon);
     WBRename(true, "SBApplicationIcon", @selector(icon), (IMP) &SBApplicationIcon$icon);
     WBRename(true, "SBBookmarkIcon", @selector(icon), (IMP) &SBBookmarkIcon$icon);
@@ -1061,6 +1083,7 @@ extern "C" void WBInitialize() {
     UIImages_ = [[NSMutableDictionary alloc] initWithCapacity:16];
     PathImages_ = [[NSMutableDictionary alloc] initWithCapacity:16];
     Files_ = [[NSMutableDictionary alloc] initWithCapacity:16];
+    Cache_ = [[NSMutableDictionary alloc] initWithCapacity:64];
 
     themes_ = [[NSMutableArray alloc] initWithCapacity:8];
 
