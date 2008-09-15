@@ -129,6 +129,7 @@ void WBInject(const char *classname, const char *oldname, IMP newimp, const char
 /* }}} */
 
 @protocol WinterBoard
+- (id) wb_initWithBadge:(id)badge;
 - (void) wb_cacheImageForIcon:(SBIcon *)icon;
 - (UIImage *) wb_getCachedImagedForIcon:(SBIcon *)icon;
 - (CGSize) wb_renderedSizeOfNode:(id)node constrainedToWidth:(float)width;
@@ -704,7 +705,8 @@ extern "C" CGColorRef CGGStateGetFillColor(void *);
 extern "C" CGColorRef CGGStateGetStrokeColor(void *);
 extern "C" NSString *UIStyleStringFromColor(CGColorRef);*/
 
-@interface WBTime : NSProxy {
+/* WBTimeLabel {{{ */
+@interface WBTimeLabel : NSProxy {
     NSString *time_;
     _transient SBStatusBarTimeView *view_;
 }
@@ -713,7 +715,7 @@ extern "C" NSString *UIStyleStringFromColor(CGColorRef);*/
 
 @end
 
-@implementation WBTime
+@implementation WBTimeLabel
 
 - (void) dealloc {
     [time_ release];
@@ -747,15 +749,57 @@ WBDelegate(time_)
 }
 
 @end
-
-@interface WBIconLabel : NSProxy {
-    NSString *string_;
-    BOOL docked_;
+/* }}} */
+/* WBBadgeLabel {{{ */
+@interface WBBadgeLabel : NSProxy {
+    NSString *badge_;
 }
 
-- (id) initWithString:(NSString *)string;
+- (id) initWithBadge:(NSString *)badge;
 
 @end
+
+@implementation WBBadgeLabel
+
+- (void) dealloc {
+    [badge_ release];
+    [super dealloc];
+}
+
+- (id) initWithBadge:(NSString *)badge {
+    badge_ = [badge retain];
+    return self;
+}
+
+WBDelegate(badge_)
+
+- (CGSize) drawAtPoint:(CGPoint)point forWidth:(float)width withFont:(UIFont *)font lineBreakMode:(int)mode {
+    if (NSString *custom = [Info_ objectForKey:@"BadgeStyle"]) {
+        [badge_ drawAtPoint:point withStyle:[NSString stringWithFormat:@""
+            "font-family: Helvetica; "
+            "font-weight: bold; "
+            "font-size: 17px; "
+            "color: white; "
+        "%@", custom]];
+
+        return CGSizeZero;
+    }
+
+    return [badge_ drawAtPoint:point forWidth:width withFont:font lineBreakMode:mode];
+}
+
+@end
+/* }}} */
+
+static id SBIconBadge$initWithBadge$(SBIconBadge<WinterBoard> *self, SEL sel, NSString *badge) {
+    if ((self = [self wb_initWithBadge:badge]) != nil) {
+        id label;
+        object_getInstanceVariable(self, "_badge", reinterpret_cast<void **>(&label));
+        if (label != nil)
+            if ((label = [[WBBadgeLabel alloc] initWithBadge:[label autorelease]]) != nil)
+                object_setInstanceVariable(self, "_badge", reinterpret_cast<void *>(label));
+    } return self;
+}
 
 static void SBStatusBarController$setStatusBarMode$orientation$duration$fenceID$animation$(SBStatusBarController<WinterBoard> *self, SEL sel, int mode, int orientation, float duration, int id, int animation) {
     if (Debug_)
@@ -779,8 +823,8 @@ static id SBStatusBarContentsView$initWithStatusBar$mode$(SBStatusBarContentsVie
 static void SBStatusBarTimeView$drawRect$(SBStatusBarTimeView<WinterBoard> *self, SEL sel, CGRect rect) {
     id time;
     object_getInstanceVariable(self, "_time", reinterpret_cast<void **>(&time));
-    if (time != nil && [time class] != [WBTime class])
-        object_setInstanceVariable(self, "_time", reinterpret_cast<void *>([[WBTime alloc] initWithTime:[time autorelease] view:self]));
+    if (time != nil && [time class] != [WBTimeLabel class])
+        object_setInstanceVariable(self, "_time", reinterpret_cast<void *>([[WBTimeLabel alloc] initWithTime:[time autorelease] view:self]));
     return [self wb_drawRect:rect];
 }
 
@@ -1054,24 +1098,25 @@ extern "C" void WBInitialize() {
 
     WBRename(true, "WebCoreFrameBridge", @selector(renderedSizeOfNode:constrainedToWidth:), (IMP) &WebCoreFrameBridge$renderedSizeOfNode$constrainedToWidth$);
 
-    WBRename(true, "SBIconModel", @selector(cacheImageForIcon:), (IMP) &SBIconModel$cacheImageForIcon$);
-    WBRename(true, "SBIconModel", @selector(getCachedImagedForIcon:), (IMP) &SBIconModel$getCachedImagedForIcon$);
-
     WBRename(true, "SBApplication", @selector(pathForIcon), (IMP) &SBApplication$pathForIcon);
     WBRename(true, "SBApplicationIcon", @selector(icon), (IMP) &SBApplicationIcon$icon);
     WBRename(true, "SBBookmarkIcon", @selector(icon), (IMP) &SBBookmarkIcon$icon);
     WBRename(true, "SBButtonBar", @selector(didMoveToSuperview), (IMP) &$didMoveToSuperview);
     WBRename(true, "SBCalendarIconContentsView", @selector(drawRect:), (IMP) &SBCalendarIconContentsView$drawRect$);
     WBRename(true, "SBContentLayer", @selector(initWithSize:), (IMP) &SBContentLayer$initWithSize$);
+    WBRename(true, "SBIconBadge", @selector(initWithBadge:), (IMP) &SBIconBadge$initWithBadge$);
+    WBRename(true, "SBIconController", @selector(appendIconList:), (IMP) &SBIconController$appendIconList$);
+    WBRename(true, "SBIconLabel", @selector(drawRect:), (IMP) &SBIconLabel$drawRect$);
     WBRename(true, "SBIconLabel", @selector(initWithSize:label:), (IMP) &SBIconLabel$initWithSize$label$);
     WBRename(true, "SBIconLabel", @selector(setInDock:), (IMP) &SBIconLabel$setInDock$);
-    WBRename(true, "SBIconLabel", @selector(drawRect:), (IMP) &SBIconLabel$drawRect$);
+    WBRename(true, "SBIconModel", @selector(cacheImageForIcon:), (IMP) &SBIconModel$cacheImageForIcon$);
+    WBRename(true, "SBIconModel", @selector(getCachedImagedForIcon:), (IMP) &SBIconModel$getCachedImagedForIcon$);
+
     WBRename(true, "SBSlidingAlertDisplay", @selector(updateDesktopImage:), (IMP) &SBSlidingAlertDisplay$updateDesktopImage$);
     WBRename(true, "SBStatusBarContentsView", @selector(didMoveToSuperview), (IMP) &$didMoveToSuperview);
     WBRename(true, "SBStatusBarContentsView", @selector(initWithStatusBar:mode:), (IMP) &SBStatusBarContentsView$initWithStatusBar$mode$);
     WBRename(true, "SBStatusBarController", @selector(setStatusBarMode:orientation:duration:fenceID:animation:), (IMP) &SBStatusBarController$setStatusBarMode$orientation$duration$fenceID$animation$);
     WBRename(true, "SBStatusBarTimeView", @selector(drawRect:), (IMP) &SBStatusBarTimeView$drawRect$);
-    WBRename(true, "SBIconController", @selector(appendIconList:), (IMP) &SBIconController$appendIconList$);
 
     _UISharedImageInitialize(false);
 
