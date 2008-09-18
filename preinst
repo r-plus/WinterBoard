@@ -5,6 +5,7 @@ cydia=($CYDIA)
 
 if [[ $1 == install ]]; then
     /usr/libexec/cydia/move.sh /Library/Themes
+
     if [[ ${CYDIA+@} ]]; then
         eval "echo 'finish:restart' >&${cydia[0]}"
     fi
@@ -23,6 +24,8 @@ elif [[ $1 == upgrade ]]; then
 fi
 
 if [[ $1 == install || $1 == upgrade ]]; then
+    chmod 755 /Library/Themes/
+
     {
         grep -v ' com\.saurik\.winterboard\.' /etc/notify.conf
         cat <<EOF

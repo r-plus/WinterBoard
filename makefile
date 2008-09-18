@@ -9,8 +9,8 @@ all: WinterBoard WinterBoard.dylib UIImages
 clean:
 	rm -f WinterBoard WinterBoard.dylib UIImages
 
-WinterBoard.dylib: Library.mm makefile
-	$(target)g++ -dynamiclib -g0 -O2 -Wall -o $@ $(filter %.mm,$^) -framework CoreFoundation -framework Foundation -lobjc -init _WBInitialize -I/apl/inc/iPhoneOS-2.0 -framework CoreGraphics -I../mobilesubstrate -L../mobilesubstrate -lsubstrate
+WinterBoard.dylib: Library.mm makefile ../mobilesubstrate/substrate.h
+	$(target)g++ -dynamiclib -g0 -O2 -Wall -o $@ $(filter %.mm,$^) -framework CoreFoundation -framework Foundation -lobjc -init _WBInitialize -I/apl/inc/iPhoneOS-2.0 -framework CoreGraphics -I../mobilesubstrate -L../mobilesubstrate -lsubstrate -framework UIKit
 
 UIImages: UIImages.mm makefile
 	$(target)g++ -g0 -O2 -Wall -Werror -o $@ $(filter %.mm,$^) -framework UIKit -framework Foundation -framework CoreFoundation -lobjc -I/apl/inc/iPhoneOS-2.0
@@ -25,6 +25,7 @@ package:
 	mkdir -p winterboard/Library/Themes
 	mkdir -p winterboard/Library/MobileSubstrate/DynamicLibraries
 	ln -s /Applications/WinterBoard.app/WinterBoard.dylib winterboard/Library/MobileSubstrate/DynamicLibraries
+	cp -a WinterBoard.plist winterboard/Library/MobileSubstrate/DynamicLibraries
 	cp -a *.theme winterboard/Library/Themes
 	find winterboard/Library/Themes -name .svn | while read -r line; do rm -rf "$${line}"; done
 	cp -a control preinst prerm winterboard/DEBIAN
