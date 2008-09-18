@@ -274,7 +274,7 @@ static NSString *$pathForFile$inBundle$(NSString *file, NSBundle<WinterBoard> *b
     if (NSString *folder = [[bundle bundlePath] lastPathComponent])
         [names addObject:[NSString stringWithFormat:@"Folders/%@/%@", folder, file]];
     if (ui)
-        [names addObject:[NSString stringWithFormat:@"UIImages/%@/%@", file]];
+        [names addObject:[NSString stringWithFormat:@"UIImages/%@", file]];
 
     #define remapResourceName(oldname, newname) \
         else if ([file isEqualToString:oldname]) \
