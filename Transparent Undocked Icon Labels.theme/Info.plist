@@ -5,7 +5,4 @@
 <key>UndockedIconLabelStyle</key>
 <string>color: transparent</string>
 
-<key>DockedIconLabelStyle</key>
-<string>color: transparent</string>
-
 </dict></plist>
