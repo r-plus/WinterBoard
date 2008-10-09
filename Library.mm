@@ -589,6 +589,25 @@ static id SBContentLayer$initWithSize$(SBContentLayer<WinterBoard> *self, SEL se
         }
     }
 
+    for (size_t i(0), e([themes_ count]); i != e; ++i) {
+        NSString *theme = [themes_ objectAtIndex:(e - i - 1)];
+        NSString *html = [theme stringByAppendingPathComponent:@"Widget.html"];
+        if ([Manager_ fileExistsAtPath:html]) {
+            CGRect bounds = [self bounds];
+
+            UIWebDocumentView *view([[[UIWebDocumentView alloc] initWithFrame:bounds] autorelease]);
+            [view setAutoresizes:true];
+
+            NSURL *url = [NSURL fileURLWithPath:html];
+            [view loadRequest:[NSURLRequest requestWithURL:url]];
+
+            [[view webView] setDrawsBackground:false];
+            [view setBackgroundColor:[UIColor clearColor]];
+
+            [self addSubview:view];
+        }
+    }
+
     return self;
 }
 
