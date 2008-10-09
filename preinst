@@ -33,6 +33,8 @@ reserve com.saurik.winterboard. 0 0 rwr-r-
 monitor com.saurik.winterboard.lockbackground /var/mobile/Library/LockBackground.jpg
 EOF
     } >/etc/notify.conf_ &&
+        chmod --reference=/etc/notify.conf /etc/notify.conf_ &&
+        chown --reference=/etc/notify.conf /etc/notify.conf_ &&
         mv -f /etc/notify.conf{_,} || rm -f /etc/notify.conf_
     killall -1 notifyd
 fi

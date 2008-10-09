@@ -44,23 +44,7 @@
 
 #include <substrate.h>
 
-#import <UIKit/UIColor.h>
-#import <UIKit/UIFont.h>
-#import <UIKit/UIImage.h>
-#import <UIKit/UIImageView.h>
-#import <UIKit/UINavigationBar.h>
-#import <UIKit/UINavigationBarBackground.h>
-#import <UIKit/UIToolbar.h>
-#import <UIKit/UIWebDocumentView.h>
-
-#import <UIKit/NSString-UIStringDrawing.h>
-#import <UIKit/NSString-UIStringDrawingDeprecated.h>
-
-#import <UIKit/UIImage-UIImageDeprecated.h>
-
-#import <UIKit/UIView-Geometry.h>
-#import <UIKit/UIView-Hierarchy.h>
-#import <UIKit/UIView-Rendering.h>
+#import <UIKit/UIKit.h>
 
 #import <SpringBoard/SBApplication.h>
 #import <SpringBoard/SBApplicationIcon.h>
@@ -74,8 +58,11 @@
 #import <SpringBoard/SBSlidingAlertDisplay.h>
 #import <SpringBoard/SBStatusBarContentsView.h>
 #import <SpringBoard/SBStatusBarController.h>
+#import <SpringBoard/SBStatusBarOperatorNameView.h>
 #import <SpringBoard/SBStatusBarTimeView.h>
 #import <SpringBoard/SBUIController.h>
+
+#import <MobileSMS/mSMSMessageTranscriptController.h>
 
 #import <MediaPlayer/MPVideoView.h>
 #import <MediaPlayer/MPVideoView-PlaybackControl.h>
@@ -113,6 +100,9 @@ bool Debug_ = false;
 bool Engineer_ = false;
 
 @protocol WinterBoard
+- (void) wb$setOperatorName:(NSString *)name fullSize:(BOOL)full;
+- (NSString *) wb$operatorNameStyle;
+- (void) wb$loadView;
 - (NSString *) wb$localizedStringForKey:(NSString *)key value:(NSString *)value table:(NSString *)table;
 - (id) wb$initWithBadge:(id)badge;
 - (void) wb$cacheImageForIcon:(SBIcon *)icon;
@@ -153,13 +143,15 @@ bool Engineer_ = false;
 
 static NSMutableDictionary *UIImages_;
 static NSMutableDictionary *PathImages_;
+static NSMutableDictionary *Cache_;
+static NSMutableDictionary *Strings_;
 
 static NSFileManager *Manager_;
 static NSDictionary *English_;
 static NSMutableDictionary *Info_;
 static NSMutableArray *themes_;
 
-static NSString *$getTheme$(NSArray *files) {
+static NSString *$getTheme$(NSArray *files, bool parent = false) { 
     if (Debug_)
         NSLog(@"WB:Debug: %@", [files description]);
 
@@ -167,7 +159,7 @@ static NSString *$getTheme$(NSArray *files) {
         for (NSString *file in files) {
             NSString *path([NSString stringWithFormat:@"%@/%@", theme, file]);
             if ([Manager_ fileExistsAtPath:path])
-                return path;
+                return parent ? theme : path;
         }
 
     return nil;
@@ -210,8 +202,6 @@ static NSString *$pathForIcon$(SBApplication<WinterBoard> *self) {
         return path;
     return nil;
 }
-
-static NSMutableDictionary *Cache_;
 
 static void SBIconModel$cacheImageForIcon$(SBIconModel<WinterBoard> *self, SEL sel, SBIcon *icon) {
     [self wb$cacheImageForIcon:icon];
@@ -404,15 +394,17 @@ static bool $setBarStyle$_(NSString *name, UIView<WinterBoard> *self, int style)
 }
 
 static void SBCalendarIconContentsView$drawRect$(SBCalendarIconContentsView<WinterBoard> *self, SEL sel, CGRect rect) {
+    NSBundle *bundle([NSBundle mainBundle]);
+
     CFLocaleRef locale(CFLocaleCopyCurrent());
     CFDateFormatterRef formatter(CFDateFormatterCreate(NULL, locale, kCFDateFormatterNoStyle, kCFDateFormatterNoStyle));
     CFRelease(locale);
 
     CFDateRef now(CFDateCreate(NULL, CFAbsoluteTimeGetCurrent()));
 
-    CFDateFormatterSetFormat(formatter, CFSTR("d"));
+    CFDateFormatterSetFormat(formatter, (CFStringRef) [bundle localizedStringForKey:@"CALENDAR_ICON_DAY_NUMBER_FORMAT" value:@"" table:@"SpringBoard"]);
     CFStringRef date(CFDateFormatterCreateStringWithDate(NULL, formatter, now));
-    CFDateFormatterSetFormat(formatter, CFSTR("EEEE"));
+    CFDateFormatterSetFormat(formatter, (CFStringRef) [bundle localizedStringForKey:@"CALENDAR_ICON_DAY_NAME_FORMAT" value:@"" table:@"SpringBoard"]);
     CFStringRef day(CFDateFormatterCreateStringWithDate(NULL, formatter, now));
 
     CFRelease(now);
@@ -441,15 +433,16 @@ static void SBCalendarIconContentsView$drawRect$(SBCalendarIconContentsView<Wint
         daystyle = [daystyle stringByAppendingString:style];
 
     float width([self bounds].size.width);
-    CGSize datesize = [(NSString *)date sizeWithStyle:datestyle forWidth:width];
-    CGSize daysize = [(NSString *)day sizeWithStyle:daystyle forWidth:width];
+    float leeway(10);
+    CGSize datesize = [(NSString *)date sizeWithStyle:datestyle forWidth:(width + leeway)];
+    CGSize daysize = [(NSString *)day sizeWithStyle:daystyle forWidth:(width + leeway)];
 
     [(NSString *)date drawAtPoint:CGPointMake(
-        (width - datesize.width) / 2, (71 - datesize.height) / 2
+        (width + 1 - datesize.width) / 2, (71 - datesize.height) / 2
     ) withStyle:datestyle];
 
     [(NSString *)day drawAtPoint:CGPointMake(
-        (width - daysize.width) / 2, (16 - daysize.height) / 2
+        (width + 1 - daysize.width) / 2, (16 - daysize.height) / 2
     ) withStyle:daystyle];
 
     CFRelease(date);
@@ -521,56 +514,79 @@ static UIImage *UIImage$defaultDesktopImage$(UIImage<WinterBoard> *self, SEL sel
     return [self wb$defaultDesktopImage];
 }
 
+static NSArray *Wallpapers_;
+static NSString *WallpaperFile_;
 static UIImageView *WallpaperImage_;
 static UIWebDocumentView *WallpaperPage_;
 static NSURL *WallpaperURL_;
+
+#define _release(object) \
+    do if (object != nil) { \
+        [object release]; \
+        object = nil; \
+    } while (false)
 
 static id SBContentLayer$initWithSize$(SBContentLayer<WinterBoard> *self, SEL sel, CGSize size) {
     self = [self wb$initWithSize:size];
     if (self == nil)
         return nil;
 
-    if (NSString *path = $getTheme$([NSArray arrayWithObject:@"Wallpaper.mp4"])) {
-        MPVideoView *video = [[[$MPVideoView alloc] initWithFrame:[self bounds]] autorelease];
-        [video setMovieWithPath:path];
-        [video setRepeatMode:1];
-        [video setRepeatGap:0];
-        [self addSubview:video];
-        [video playFromBeginning];;
-    }
+    _release(WallpaperFile_);
+    _release(WallpaperImage_);
+    _release(WallpaperPage_);
+    _release(WallpaperURL_);
 
-    UIImage *image;
-    if (NSString *path = $getTheme$([NSArray arrayWithObjects:@"Wallpaper.png", @"Wallpaper.jpg", nil])) {
-        image = [[UIImage alloc] wb$initWithContentsOfFile:path];
-        if (image != nil)
-            image = [image autorelease];
-    } else image = nil;
+    if (NSString *theme = $getTheme$(Wallpapers_, true)) {
+        NSString *mp4 = [theme stringByAppendingPathComponent:@"Wallpaper.mp4"];
+        if ([Manager_ fileExistsAtPath:mp4]) {
+            MPVideoView *video = [[[$MPVideoView alloc] initWithFrame:[self bounds]] autorelease];
+            [video setMovieWithPath:mp4];
+            [video setRepeatMode:1];
+            [video setRepeatGap:0];
+            [self addSubview:video];
+            [video playFromBeginning];;
+        }
 
-    if (WallpaperImage_ != nil)
-        [WallpaperImage_ release];
-    WallpaperImage_ = [[UIImageView alloc] initWithImage:image];
-    [self addSubview:WallpaperImage_];
+        NSString *png = [theme stringByAppendingPathComponent:@"Wallpaper.png"];
+        NSString *jpg = [theme stringByAppendingPathComponent:@"Wallpaper.jpg"];
 
-    if (NSString *path = $getTheme$([NSArray arrayWithObject:@"Wallpaper.html"])) {
-        CGRect bounds = [self bounds];
+        NSString *path;
+        if ([Manager_ fileExistsAtPath:png])
+            path = png;
+        else if ([Manager_ fileExistsAtPath:jpg])
+            path = jpg;
+        else path = nil;
 
-        UIWebDocumentView *view([[[UIWebDocumentView alloc] initWithFrame:bounds] autorelease]);
-        [view setAutoresizes:true];
+        UIImage *image;
+        if (path != nil) {
+            image = [[UIImage alloc] wb$initWithContentsOfFile:path];
+            if (image != nil)
+                image = [image autorelease];
+        } else image = nil;
 
-        if (WallpaperPage_ != nil)
-            [WallpaperPage_ release];
-        WallpaperPage_ = [view retain];
+        if (image != nil) {
+            WallpaperFile_ = [path retain];
+            WallpaperImage_ = [[UIImageView alloc] initWithImage:image];
+            [self addSubview:WallpaperImage_];
+        }
 
-        if (WallpaperURL_ != nil)
-            [WallpaperURL_ release];
-        WallpaperURL_ = [[NSURL fileURLWithPath:path] retain];
+        NSString *html = [theme stringByAppendingPathComponent:@"Wallpaper.html"];
+        if ([Manager_ fileExistsAtPath:html]) {
+            CGRect bounds = [self bounds];
 
-        [WallpaperPage_ loadRequest:[NSURLRequest requestWithURL:WallpaperURL_]];
+            UIWebDocumentView *view([[[UIWebDocumentView alloc] initWithFrame:bounds] autorelease]);
+            [view setAutoresizes:true];
 
-        [[view webView] setDrawsBackground:false];
-        [view setBackgroundColor:[UIColor clearColor]];
+            WallpaperPage_ = [view retain];
+            WallpaperURL_ = [[NSURL fileURLWithPath:html] retain];
 
-        [self addSubview:view];
+            [WallpaperPage_ loadRequest:[NSURLRequest requestWithURL:WallpaperURL_]];
+
+            [[view webView] setDrawsBackground:false];
+            [view setBackgroundColor:[UIColor clearColor]];
+
+            [self addSubview:view];
+        }
     }
 
     return self;
@@ -722,6 +738,21 @@ static id SBStatusBarContentsView$initWithStatusBar$mode$(SBStatusBarContentsVie
     return [self wb$initWithStatusBar:bar mode:mode];
 }
 
+static NSString *SBStatusBarOperatorNameView$operatorNameStyle(SBStatusBarOperatorNameView<WinterBoard> *self, SEL sel, NSString *name, BOOL full) {
+    NSString *style([self wb$operatorNameStyle]);
+    if (Debug_)
+        NSLog(@"operatorNameStyle= %@", style);
+    if (NSString *custom = [Info_ objectForKey:@"OperatorNameStyle"])
+        style = [NSString stringWithFormat:@"%@; %@", style, custom];
+    return style;
+}
+
+static void SBStatusBarOperatorNameView$setOperatorName$fullSize$(SBStatusBarOperatorNameView<WinterBoard> *self, SEL sel, NSString *name, BOOL full) {
+    if (Debug_)
+        NSLog(@"setOperatorName:\"%@\" fullSize:%u", name, full);
+    [self wb$setOperatorName:name fullSize:NO];
+}
+
 static void SBStatusBarTimeView$drawRect$(SBStatusBarTimeView<WinterBoard> *self, SEL sel, CGRect rect) {
     id &_time(MSHookIvar<id>(self, "_time"));
     if (_time != nil && [_time class] != [WBTimeLabel class])
@@ -750,8 +781,6 @@ static void SBIconLabel$setInDock$(SBIconLabel<WinterBoard> *self, SEL sel, BOOL
         [_label setInDock:docked];
     return [self wb$setInDock:docked];
 }
-
-static NSMutableDictionary *Strings_;
 
 static NSString *NSBundle$localizedStringForKey$value$table$(NSBundle<WinterBoard> *self, SEL sel, NSString *key, NSString *value, NSString *table) {
     NSString *identifier = [self bundleIdentifier];
@@ -818,6 +847,19 @@ static void SBIconLabel$drawRect$(SBIconLabel<WinterBoard> *self, SEL sel, CGRec
     [label drawAtPoint:CGPointMake((bounds.size.width - size.width) / 2, 0) withStyle:style];
 }
 
+void mSMSMessageTranscriptController$loadView(mSMSMessageTranscriptController<WinterBoard> *self, SEL sel) {
+    [self wb$loadView];
+    if (NSString *path = $getTheme$([NSArray arrayWithObjects:@"SMSBackground.png", @"SMSBackground.jpg", nil]))
+        if (UIImage *image = [[UIImage alloc] wb$initWithContentsOfFile:path]) {
+            [image autorelease];
+            UIView *&_transcriptLayer(MSHookIvar<UIView *>(self, "_transcriptLayer"));
+            UIView *parent([_transcriptLayer superview]);
+            UIImageView *background([[[UIImageView alloc] initWithImage:image] autorelease]);
+            [parent insertSubview:background belowSubview:_transcriptLayer];
+            [_transcriptLayer setBackgroundColor:[UIColor clearColor]];
+        }
+}
+
 extern "C" void FindMappedImages(void);
 extern "C" NSData *UIImagePNGRepresentation(UIImage *);
 
@@ -874,11 +916,6 @@ static UIImage *$_UIImageWithNameInDomain(NSString *name, NSString *domain) {
     return image;
 }
 
-template <typename Type_>
-static void WBReplace(Type_ *symbol, Type_ *replace) {
-    return WBReplace(symbol, replace, static_cast<Type_ **>(NULL));
-}
-
 #define AudioToolbox "/System/Library/Frameworks/AudioToolbox.framework/AudioToolbox"
 #define UIKit "/System/Library/Frameworks/UIKit.framework/UIKit"
 
@@ -917,8 +954,8 @@ static void ChangeWallpaper(
         NSLog(@"WB:Debug:ChangeWallpaper!");
 
     UIImage *image;
-    if (NSString *path = $getTheme$([NSArray arrayWithObjects:@"Wallpaper.png", @"Wallpaper.jpg", nil])) {
-        image = [[UIImage alloc] wb$initWithContentsOfFile:path];
+    if (WallpaperFile_ != nil) {
+        image = [[UIImage alloc] wb$initWithContentsOfFile:WallpaperFile_];
         if (image != nil)
             image = [image autorelease];
     } else image = nil;
@@ -930,16 +967,15 @@ static void ChangeWallpaper(
 
 }
 
+#define Prefix_ "wb$"
+
 void WBRename(bool instance, const char *name, SEL sel, IMP imp) {
-    Class _class = objc_getClass(name);
-    if (_class == nil) {
-        if (Debug_)
-            NSLog(@"WB:Warning: cannot find class [%s]", name);
-        return;
-    }
-    if (!instance)
-        _class = object_getClass(_class);
-    MSHookMessage(_class, sel, imp, "wb$");
+    if (Class _class = objc_getClass(name)) {
+        if (!instance)
+            _class = object_getClass(_class);
+        MSHookMessage(_class, sel, imp, Prefix_);
+    } else if (Debug_)
+        NSLog(@"WB:Warning: cannot find class [%s]", name);
 }
 
 extern "C" void WBInitialize() {
@@ -1056,7 +1092,10 @@ extern "C" void WBInitialize() {
                 if ([Info_ objectForKey:key] == nil)
                     [Info_ setObject:[info objectForKey:key] forKey:key];
 
-    if ([identifier isEqualToString:@"com.apple.springboard"]) {
+    if ([identifier isEqualToString:@"com.apple.MobileSMS"]) {
+        Class mSMSMessageTranscriptController = objc_getClass("mSMSMessageTranscriptController");
+        MSHookMessage(mSMSMessageTranscriptController, @selector(loadView), (IMP) &mSMSMessageTranscriptController$loadView, Prefix_);
+    } else if ([identifier isEqualToString:@"com.apple.springboard"]) {
         CFNotificationCenterAddObserver(
             CFNotificationCenterGetDarwinNotifyCenter(),
             NULL, &ChangeWallpaper, (CFStringRef) @"com.saurik.winterboard.lockbackground", NULL, 0
@@ -1088,6 +1127,8 @@ extern "C" void WBInitialize() {
         WBRename(true, "SBStatusBarContentsView", @selector(didMoveToSuperview), (IMP) &$didMoveToSuperview);
         WBRename(true, "SBStatusBarContentsView", @selector(initWithStatusBar:mode:), (IMP) &SBStatusBarContentsView$initWithStatusBar$mode$);
         WBRename(true, "SBStatusBarController", @selector(setStatusBarMode:orientation:duration:fenceID:animation:), (IMP) &SBStatusBarController$setStatusBarMode$orientation$duration$fenceID$animation$);
+        WBRename(true, "SBStatusBarOperatorNameView", @selector(operatorNameStyle), (IMP) &SBStatusBarOperatorNameView$operatorNameStyle);
+        WBRename(true, "SBStatusBarOperatorNameView", @selector(setOperatorName:fullSize:), (IMP) &SBStatusBarOperatorNameView$setOperatorName$fullSize$);
         WBRename(true, "SBStatusBarTimeView", @selector(drawRect:), (IMP) &SBStatusBarTimeView$drawRect$);
 
         English_ = [[NSDictionary alloc] initWithContentsOfFile:@"/System/Library/CoreServices/SpringBoard.app/English.lproj/LocalizedApplicationNames.strings"];
@@ -1097,13 +1138,15 @@ extern "C" void WBInitialize() {
         Cache_ = [[NSMutableDictionary alloc] initWithCapacity:64];
     }
 
+    Wallpapers_ = [[NSArray arrayWithObjects:@"Wallpaper.mp4", @"Wallpaper.png", @"Wallpaper.jpg", @"Wallpaper.html", nil] retain];
+
     if ([Info_ objectForKey:@"UndockedIconLabels"] == nil)
         [Info_ setObject:[NSNumber numberWithBool:(
+            $getTheme$(Wallpapers_) == nil ||
             [Info_ objectForKey:@"DockedIconLabelStyle"] != nil ||
             [Info_ objectForKey:@"UndockedIconLabelStyle"] != nil
         )] forKey:@"UndockedIconLabels"];
 
-    if (![Info_ boolForKey:@"UndockedIconLabels"])
     if (Debug_)
         NSLog(@"WB:Debug:Info = %@", [Info_ description]);
 

@@ -189,10 +189,10 @@ static BOOL changed_;
         if ([themesSet containsObject:theme])
             continue;
         [themesSet addObject:theme];
-        [themesArray_ addObject:[[NSDictionary dictionaryWithObjectsAndKeys:
+        [themesArray_ insertObject:[[NSDictionary dictionaryWithObjectsAndKeys:
             theme, @"Name",
             [NSNumber numberWithBool:NO], @"Active",
-        nil] mutableCopy]];
+        nil] mutableCopy] atIndex:0];
     }
 
     themesTable_ = [[UITableView alloc] initWithFrame:window_.bounds];

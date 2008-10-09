@@ -9,6 +9,8 @@ if [[ $1 == remove ]]; then
     fi
 
     grep -v ' com\.saurik\.winterboard\.' /etc/notify.conf >/etc/notify.conf_ &&
+        chmod --reference=/etc/notify.conf /etc/notify.conf_ &&
+        chown --reference=/etc/notify.conf /etc/notify.conf_ &&
         mv -f /etc/notify.conf{_,} || rm -f /etc/notify.conf_
     killall -1 notifyd
 fi
