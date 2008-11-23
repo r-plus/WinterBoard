@@ -12,7 +12,6 @@ if [[ $1 == remove ]]; then
         chmod --reference=/etc/notify.conf /etc/notify.conf_ &&
         chown --reference=/etc/notify.conf /etc/notify.conf_ &&
         mv -f /etc/notify.conf{_,} || rm -f /etc/notify.conf_
-    killall -1 notifyd
 fi
 
 exit 0

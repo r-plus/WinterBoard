@@ -10,13 +10,13 @@ clean:
 	rm -f WinterBoard WinterBoard.dylib UIImages
 
 WinterBoard.dylib: Library.mm makefile ../mobilesubstrate/substrate.h
-	$(target)g++ -dynamiclib -g0 -O2 -Wall -o $@ $(filter %.mm,$^) -framework CoreFoundation -framework Foundation -lobjc -init _WBInitialize -I/apl/inc/iPhoneOS-2.0 -framework CoreGraphics -I../mobilesubstrate -L../mobilesubstrate -lsubstrate -framework UIKit
+	$(target)g++ -dynamiclib -g0 -O2 -Wall -o $@ $(filter %.mm,$^) -framework CoreFoundation -framework Foundation -lobjc -init _WBInitialize -I/apl/inc/iPhoneOS-2.0 -framework CoreGraphics -I../mobilesubstrate -L../mobilesubstrate -lsubstrate -framework UIKit -multiply_defined suppress
 
 UIImages: UIImages.mm makefile
-	$(target)g++ -g0 -O2 -Wall -Werror -o $@ $(filter %.mm,$^) -framework UIKit -framework Foundation -framework CoreFoundation -lobjc -I/apl/inc/iPhoneOS-2.0
+	$(target)g++ -g0 -O2 -Wall -Werror -o $@ $(filter %.mm,$^) -framework UIKit -framework Foundation -framework CoreFoundation -lobjc -I/apl/inc/iPhoneOS-2.0 -multiply_defined suppress
 
 WinterBoard: Application.mm makefile
-	$(target)g++ -g0 -O2 -Wall -Werror -o $@ $(filter %.mm,$^) -framework UIKit -framework Foundation -framework CoreFoundation -lobjc -framework CoreGraphics -I/apl/sdk
+	$(target)g++ -g0 -O2 -Wall -Werror -o $@ $(filter %.mm,$^) -framework UIKit -framework Foundation -framework CoreFoundation -lobjc -framework CoreGraphics -I/apl/sdk -multiply_defined suppress
 
 package:
 	rm -rf winterboard
