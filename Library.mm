@@ -102,7 +102,6 @@ bool Engineer_ = false;
 @protocol WinterBoard
 - (void) wb$setOperatorName:(NSString *)name fullSize:(BOOL)full;
 - (NSString *) wb$operatorNameStyle;
-- (void) wb$loadView;
 - (NSString *) wb$localizedStringForKey:(NSString *)key value:(NSString *)value table:(NSString *)table;
 - (id) wb$initWithBadge:(id)badge;
 - (void) wb$cacheImageForIcon:(SBIcon *)icon;
@@ -116,7 +115,6 @@ bool Engineer_ = false;
 - (id) wb$init;
 - (id) wb$layer;
 - (id) wb$initWithSize:(CGSize)size;
-- (id) wb$initWithSize:(CGSize)size label:(NSString *)label;
 - (id) wb$initWithFrame:(CGRect)frame;
 - (id) wb$initWithCoder:(NSCoder *)coder;
 - (void) wb$setFrame:(CGRect)frame;
@@ -126,7 +124,6 @@ bool Engineer_ = false;
 - (void) wb$setBarStyle:(int)style;
 - (id) wb$initWithFrame:(CGRect)frame withBarStyle:(int)style withTintColor:(UIColor *)color;
 - (void) wb$setOpaque:(BOOL)opaque;
-- (void) wb$setInDock:(BOOL)docked;
 - (void) wb$didMoveToSuperview;
 - (NSDictionary *) wb$infoDictionary;
 - (UIImage *) wb$icon;
@@ -814,20 +811,20 @@ static void SBIconController$appendIconList$(SBIconController<WinterBoard> *self
     return [self wb$appendIconList:list];
 }
 
-static id SBIconLabel$initWithSize$label$(SBIconLabel<WinterBoard> *self, SEL sel, CGSize size, NSString *label) {
-    self = [self wb$initWithSize:size label:label];
+MSHook(id, SBIconLabel$initWithSize$label$, SBIconLabel *self, SEL sel, CGSize size, NSString *label) {
+    self = _SBIconLabel$initWithSize$label$(self, sel, size, label);
     if (self != nil)
         [self setClipsToBounds:NO];
     return self;
 }
 
-static void SBIconLabel$setInDock$(SBIconLabel<WinterBoard> *self, SEL sel, BOOL docked) {
+MSHook(void, SBIconLabel$setInDock$, SBIconLabel *self, SEL sel, BOOL docked) {
     id &_label(MSHookIvar<id>(self, "_label"));
     if (![Info_ boolForKey:@"UndockedIconLabels"])
         docked = true;
     if (_label != nil && [_label respondsToSelector:@selector(setInDock:)])
         [_label setInDock:docked];
-    return [self wb$setInDock:docked];
+    return _SBIconLabel$setInDock$(self, sel, docked);
 }
 
 static NSString *NSBundle$localizedStringForKey$value$table$(NSBundle<WinterBoard> *self, SEL sel, NSString *key, NSString *value, NSString *table) {
@@ -865,7 +862,7 @@ static CGSize WebCoreFrameBridge$renderedSizeOfNode$constrainedToWidth$(WebCoreF
     return [self wb$renderedSizeOfNode:node constrainedToWidth:width];
 }
 
-static void SBIconLabel$drawRect$(SBIconLabel<WinterBoard> *self, SEL sel, CGRect rect) {
+MSHook(void, SBIconLabel$drawRect$, SBIconLabel *self, SEL sel, CGRect rect) {
     CGRect bounds = [self bounds];
 
     static Ivar drawMoreLegibly = object_getInstanceVariable(self, "_drawMoreLegibly", NULL);
@@ -895,8 +892,9 @@ static void SBIconLabel$drawRect$(SBIconLabel<WinterBoard> *self, SEL sel, CGRec
     [label drawAtPoint:CGPointMake((bounds.size.width - size.width) / 2, 0) withStyle:style];
 }
 
-void mSMSMessageTranscriptController$loadView(mSMSMessageTranscriptController<WinterBoard> *self, SEL sel) {
-    [self wb$loadView];
+MSHook(void, mSMSMessageTranscriptController$loadView, mSMSMessageTranscriptController *self, SEL sel) {
+    _mSMSMessageTranscriptController$loadView(self, sel);
+
     if (NSString *path = $getTheme$([NSArray arrayWithObjects:@"SMSBackground.png", @"SMSBackground.jpg", nil]))
         if (UIImage *image = [[UIImage alloc] initWithContentsOfFile:path]) {
             [image autorelease];
@@ -953,10 +951,10 @@ MSHook(UIImage *, _UIImageWithNameInDomain, NSString *name, NSString *domain) {
 #define AudioToolbox "/System/Library/Frameworks/AudioToolbox.framework/AudioToolbox"
 #define UIKit "/System/Library/Frameworks/UIKit.framework/UIKit"
 
-static bool (*_Z24GetFileNameForThisActionmPcRb)(unsigned long, char *, bool &);
+bool (*_Z24GetFileNameForThisActionmPcRb)(unsigned long a0, char *a1, bool &a2);
 
-static bool $_Z24GetFileNameForThisActionmPcRb(unsigned long a0, char *a1, bool &a2) {
-    bool value = _Z24GetFileNameForThisActionmPcRb(a0, a1, a2);
+MSHook(bool, _Z24GetFileNameForThisActionmPcRb, unsigned long a0, char *a1, bool &a2) {
+    bool value = __Z24GetFileNameForThisActionmPcRb(a0, a1, a2);
     if (Debug_)
         NSLog(@"WB:Debug:GetFileNameForThisAction(%u, %s, %u) = %u", a0, value ? a1 : NULL, a2, value);
 
@@ -1053,7 +1051,7 @@ extern "C" void WBInitialize() {
         nl[0].n_un.n_name = (char *) "__Z24GetFileNameForThisActionmPcRb";
         nlist(AudioToolbox, nl);
         _Z24GetFileNameForThisActionmPcRb = (bool (*)(unsigned long, char *, bool &)) nl[0].n_value;
-        MSHookFunction(_Z24GetFileNameForThisActionmPcRb, &$_Z24GetFileNameForThisActionmPcRb, &_Z24GetFileNameForThisActionmPcRb);
+        MSHookFunction(_Z24GetFileNameForThisActionmPcRb, &$_Z24GetFileNameForThisActionmPcRb, &__Z24GetFileNameForThisActionmPcRb);
     }
 
     WBRename(false, "UIImage", @selector(defaultDesktopImage), (IMP) &UIImage$defaultDesktopImage$);
@@ -1127,7 +1125,7 @@ extern "C" void WBInitialize() {
 
     if ([identifier isEqualToString:@"com.apple.MobileSMS"]) {
         Class mSMSMessageTranscriptController = objc_getClass("mSMSMessageTranscriptController");
-        MSHookMessage(mSMSMessageTranscriptController, @selector(loadView), (IMP) &mSMSMessageTranscriptController$loadView, Prefix_);
+        _mSMSMessageTranscriptController$loadView = MSHookMessage(mSMSMessageTranscriptController, @selector(loadView), &$mSMSMessageTranscriptController$loadView);
     } else if ([identifier isEqualToString:@"com.apple.springboard"]) {
         CFNotificationCenterAddObserver(
             CFNotificationCenterGetDarwinNotifyCenter(),
@@ -1150,9 +1148,12 @@ extern "C" void WBInitialize() {
         WBRename(true, "SBContentLayer", @selector(initWithSize:), (IMP) &SBContentLayer$initWithSize$);
         WBRename(true, "SBIconBadge", @selector(initWithBadge:), (IMP) &SBIconBadge$initWithBadge$);
         WBRename(true, "SBIconController", @selector(appendIconList:), (IMP) &SBIconController$appendIconList$);
-        WBRename(true, "SBIconLabel", @selector(drawRect:), (IMP) &SBIconLabel$drawRect$);
-        WBRename(true, "SBIconLabel", @selector(initWithSize:label:), (IMP) &SBIconLabel$initWithSize$label$);
-        WBRename(true, "SBIconLabel", @selector(setInDock:), (IMP) &SBIconLabel$setInDock$);
+
+        Class SBIconLabel = objc_getClass("SBIconLabel");
+        _SBIconLabel$drawRect$ = MSHookMessage(SBIconLabel, @selector(drawRect:), &$SBIconLabel$drawRect$);
+        _SBIconLabel$initWithSize$label$ = MSHookMessage(SBIconLabel, @selector(initWithSize:label:), &$SBIconLabel$initWithSize$label$);
+        _SBIconLabel$setInDock$ = MSHookMessage(SBIconLabel, @selector(setInDock:), &$SBIconLabel$setInDock$);
+
         WBRename(true, "SBIconModel", @selector(cacheImageForIcon:), (IMP) &SBIconModel$cacheImageForIcon$);
         WBRename(true, "SBIconModel", @selector(getCachedImagedForIcon:), (IMP) &SBIconModel$getCachedImagedForIcon$);
 
