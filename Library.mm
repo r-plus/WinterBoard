@@ -148,17 +148,29 @@ static NSMutableDictionary *Info_;
 static NSMutableArray *themes_;
 
 static NSString *$getTheme$(NSArray *files, bool parent = false) {
+    if (!parent)
+        if (NSString *path = [Themed_ objectForKey:files])
+            return reinterpret_cast<id>(path) == [NSNull null] ? nil : path;
+
     if (Debug_)
         NSLog(@"WB:Debug: %@", [files description]);
 
+    NSString *path;
+
     for (NSString *theme in themes_)
         for (NSString *file in files) {
-            NSString *path([NSString stringWithFormat:@"%@/%@", theme, file]);
-            if ([Manager_ fileExistsAtPath:path])
-                return parent ? theme : path;
+            path = [NSString stringWithFormat:@"%@/%@", theme, file];
+            if ([Manager_ fileExistsAtPath:path]) {
+                path = parent ? theme : path;
+                goto set;
+            }
         }
 
-    return nil;
+    path = nil;
+  set:
+    if (!parent)
+        [Themed_ setObject:(path == nil ? [NSNull null] : reinterpret_cast<id>(path)) forKey:files];
+    return path;
 }
 
 static NSString *$pathForFile$inBundle$(NSString *file, NSBundle *bundle, bool ui) {
@@ -1065,6 +1077,7 @@ extern "C" void WBInitialize() {
     PathImages_ = [[NSMutableDictionary alloc] initWithCapacity:16];
     Strings_ = [[NSMutableDictionary alloc] initWithCapacity:0];
     Bundles_ = [[NSMutableDictionary alloc] initWithCapacity:2];
+    Themed_ = [[NSMutableDictionary alloc] initWithCapacity:128];
 
     themes_ = [[NSMutableArray alloc] initWithCapacity:8];
 
