@@ -42,6 +42,10 @@
 #import <Foundation/Foundation.h>
 #import <CoreGraphics/CoreGraphics.h>
 
+#import <Celestial/AVController.h>
+#import <Celestial/AVItem.h>
+#import <Celestial/AVQueue.h>
+
 #include <substrate.h>
 
 #import <UIKit/UIKit.h>
@@ -65,6 +69,7 @@
 
 #import <MobileSMS/mSMSMessageTranscriptController.h>
 
+#import <MediaPlayer/MPMoviePlayerController.h>
 #import <MediaPlayer/MPVideoView.h>
 #import <MediaPlayer/MPVideoView-PlaybackControl.h>
 
@@ -76,6 +81,7 @@ extern "C" void __clear_cache (char *beg, char *end);
 - (void *) _node;
 @end
 
+Class $MPMoviePlayerController;
 Class $MPVideoView;
 Class $WebCoreFrameBridge;
 
@@ -335,9 +341,11 @@ MSHook(UIImage *, SBApplicationIcon$icon, SBApplicationIcon *self, SEL sel) {
 }
 
 MSHook(UIImage *, SBWidgetApplicationIcon$icon, SBWidgetApplicationIcon *self, SEL sel) {
-    if (NSString *path = $pathForIcon$([self application]))
+    if (Debug_)
+        NSLog(@"WB:Debug:Widget(%@:%@)", [self displayIdentifier], [self displayName]);
+    if (NSString *path = $getTheme$([NSArray arrayWithObject:[NSString stringWithFormat:@"Icons/%@.png", [self displayName]]]))
         return [UIImage imageWithContentsOfFile:path];
-    return _SBApplicationIcon$icon(self, sel);
+    return _SBWidgetApplicationIcon$icon(self, sel);
 }
 
 MSHook(UIImage *, SBBookmarkIcon$icon, SBBookmarkIcon *self, SEL sel) {
@@ -579,12 +587,38 @@ MSHook(id, SBContentLayer$initWithSize$, SBContentLayer *self, SEL sel, CGSize s
     if (NSString *theme = $getTheme$(Wallpapers_, true)) {
         NSString *mp4 = [theme stringByAppendingPathComponent:@"Wallpaper.mp4"];
         if ([Manager_ fileExistsAtPath:mp4]) {
+#if UseAVController
+            NSError *error;
+
+            static AVController *controller_(nil);
+            if (controller_ == nil) {
+                AVQueue *queue([AVQueue avQueue]);
+                controller_ = [[AVController avControllerWithQueue:queue error:&error] retain];
+            }
+
+            AVQueue *queue([controller_ queue]);
+
+            UIView *video([[[UIView alloc] initWithFrame:[self bounds]] autorelease]);
+            [controller_ setLayer:[video _layer]];
+
+            AVItem *item([[[AVItem alloc] initWithPath:mp4 error:&error] autorelease]);
+            [queue appendItem:item error:&error];
+
+            [controller_ play:&error];
+#elif UseMPMoviePlayerController
+            NSURL *url([NSURL fileURLWithPath:mp4]);
+            MPMoviePlayerController *controller = [[MPMoviePlayerController alloc] initWithContentURL:url];
+	    controller.movieControlMode = MPMovieControlModeHidden;
+	    [controller play];
+#else
             MPVideoView *video = [[[$MPVideoView alloc] initWithFrame:[self bounds]] autorelease];
             [video setMovieWithPath:mp4];
             [video setRepeatMode:1];
-            [video setRepeatGap:0];
-            [self addSubview:video];
+            [video setRepeatGap:-1];
             [video playFromBeginning];;
+#endif
+
+            [self addSubview:video];
         }
 
         NSString *png = [theme stringByAppendingPathComponent:@"Wallpaper.png"];
@@ -897,9 +931,28 @@ MSHook(void, SBIconLabel$drawRect$, SBIconLabel *self, SEL sel, CGRect rect) {
 
     if (docked)
         style = [style stringByAppendingString:@"text-shadow: rgba(0, 0, 0, 0.5) 0px -1px 0px; "];
-    float max = 75, width = [label sizeWithStyle:style forWidth:320].width;
-    if (width > max)
-        style = [style stringByAppendingString:[NSString stringWithFormat:@"letter-spacing: -%f; ", ((width - max) / ([label length] - 1))]];
+
+    bool ellipsis(false);
+    float max = 75, width;
+  width:
+    width = [(ellipsis ? [label stringByAppendingString:@"..."] : label) sizeWithStyle:style forWidth:320].width;
+
+    if (width > max) {
+        size_t length([label length]);
+        float spacing((width - max) / (length - 1));
+
+        if (spacing > 1.25) {
+            ellipsis = true;
+            label = [label substringToIndex:(length - 1)];
+            goto width;
+        }
+
+        style = [style stringByAppendingString:[NSString stringWithFormat:@"letter-spacing: -%f; ", spacing]];
+    }
+
+    if (ellipsis)
+        label = [label stringByAppendingString:@"..."];
+
     if (NSString *custom = [Info_ objectForKey:(docked ? @"DockedIconLabelStyle" : @"UndockedIconLabelStyle")])
         style = [style stringByAppendingString:custom];
 
@@ -961,6 +1014,12 @@ MSHook(UIImage *, _UIImageWithNameInDomain, NSString *name, NSString *domain) {
         image = __UIImageWithNameInDomain(name, domain);
     [PathImages_ setObject:(image == nil ? [NSNull null] : reinterpret_cast<id>(image)) forKey:key];
     return image;
+}
+
+MSHook(GSFontRef, GSFontCreateWithName, const char *name, GSFontSymbolicTraits traits, float size) {
+    if (NSString *font = [Info_ objectForKey:[NSString stringWithFormat:@"FontName-%s", name]])
+        name = [font UTF8String];
+    return _GSFontCreateWithName(name, traits, size);
 }
 
 #define AudioToolbox "/System/Library/Frameworks/AudioToolbox.framework/AudioToolbox"
@@ -1051,6 +1110,8 @@ extern "C" void WBInitialize() {
     MSHookFunction(_UIImageRefAtPath, &$_UIImageRefAtPath, &__UIImageRefAtPath);
     MSHookFunction(_UIImageWithName, &$_UIImageWithName, &__UIImageWithName);
     MSHookFunction(_UIImageWithNameInDomain, &$_UIImageWithNameInDomain, &__UIImageWithNameInDomain);
+
+    MSHookFunction(&GSFontCreateWithName, &$GSFontCreateWithName, &_GSFontCreateWithName);
 
     if (dlopen(AudioToolbox, RTLD_LAZY | RTLD_NOLOAD) != NULL) {
         struct nlist nl[2];
@@ -1150,6 +1211,7 @@ extern "C" void WBInitialize() {
         if (MediaPlayer != nil)
             [MediaPlayer load];
 
+        $MPMoviePlayerController = objc_getClass("MPMoviePlayerController");
         $MPVideoView = objc_getClass("MPVideoView");
         $WebCoreFrameBridge = objc_getClass("WebCoreFrameBridge");
 
