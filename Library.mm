@@ -920,7 +920,7 @@ MSHook(void, SBIconLabel$drawRect$, SBIconLabel *self, SEL sel, CGRect rect) {
     Ivar ivar = object_getInstanceVariable(self, "_inDock", reinterpret_cast<void **>(&docked));
     docked = (docked & (ivar_getOffset(ivar) == ivar_getOffset(drawMoreLegibly) ? 0x2 : 0x1)) != 0;
 
-    NSString *&label(MSHookIvar<NSString *>(self, "_label"));
+    NSString *label(MSHookIvar<NSString *>(self, "_label"));
 
     NSString *style = [NSString stringWithFormat:@""
         "font-family: Helvetica; "
