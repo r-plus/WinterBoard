@@ -61,6 +61,7 @@
 #import <SpringBoard/SBStatusBarOperatorNameView.h>
 #import <SpringBoard/SBStatusBarTimeView.h>
 #import <SpringBoard/SBUIController.h>
+#import <SpringBoard/SBWidgetApplicationIcon.h>
 
 #import <MobileSMS/mSMSMessageTranscriptController.h>
 
@@ -99,6 +100,7 @@ Class $SBStatusBarContentsView;
 Class $SBStatusBarController;
 Class $SBStatusBarOperatorNameView;
 Class $SBStatusBarTimeView;
+Class $SBWidgetApplicationIcon;
 
 @interface NSDictionary (WinterBoard)
 - (UIColor *) colorForKey:(NSString *)key;
@@ -329,6 +331,12 @@ MSHook(UIImage *, SBApplicationIcon$icon, SBApplicationIcon *self, SEL sel) {
     if (![Info_ boolForKey:@"ComposeStoreIcons"])
         if (NSString *path = $pathForIcon$([self application]))
             return [UIImage imageWithContentsOfFile:path];
+    return _SBApplicationIcon$icon(self, sel);
+}
+
+MSHook(UIImage *, SBWidgetApplicationIcon$icon, SBWidgetApplicationIcon *self, SEL sel) {
+    if (NSString *path = $pathForIcon$([self application]))
+        return [UIImage imageWithContentsOfFile:path];
     return _SBApplicationIcon$icon(self, sel);
 }
 
@@ -926,7 +934,7 @@ MSHook(UIImage *, _UIImageWithName, NSString *name) {
         if (image != nil)
             return reinterpret_cast<id>(image) == [NSNull null] ? nil : image;
         if (NSString *path = $pathForFile$inBundle$(name, _UIKitBundle(), true)) {
-            image = [[UIImage alloc] initWithContentsOfFile:path];
+            image = [[UIImage alloc] initWithContentsOfFile:path cache:true];
             if (image != nil)
                 [image autorelease];
         }
@@ -1160,6 +1168,7 @@ extern "C" void WBInitialize() {
         $SBStatusBarController = objc_getClass("SBStatusBarController");
         $SBStatusBarOperatorNameView = objc_getClass("SBStatusBarOperatorNameView");
         $SBStatusBarTimeView = objc_getClass("SBStatusBarTimeView");
+        $SBWidgetApplicationIcon = objc_getClass("SBWidgetApplicationIcon");
 
         WBRename(WebCoreFrameBridge, renderedSizeOfNode:constrainedToWidth:, renderedSizeOfNode$constrainedToWidth$);
 
@@ -1171,6 +1180,7 @@ extern "C" void WBInitialize() {
         WBRename(SBContentLayer, initWithSize:, initWithSize$);
         WBRename(SBIconBadge, initWithBadge:, initWithBadge$);
         WBRename(SBIconController, appendIconList:, appendIconList$);
+        WBRename(SBWidgetApplicationIcon, icon, icon);
 
         WBRename(SBIconLabel, drawRect:, drawRect$);
         WBRename(SBIconLabel, initWithSize:label:, initWithSize$label$);
