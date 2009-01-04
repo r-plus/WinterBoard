@@ -59,6 +59,7 @@
 #import <SpringBoard/SBContentLayer.h>
 #import <SpringBoard/SBIconController.h>
 #import <SpringBoard/SBIconLabel.h>
+#import <SpringBoard/SBIconModel.h>
 #import <SpringBoard/SBSlidingAlertDisplay.h>
 #import <SpringBoard/SBStatusBarContentsView.h>
 #import <SpringBoard/SBStatusBarController.h>
@@ -854,10 +855,48 @@ MSHook(void, SBStatusBarTimeView$drawRect$, SBStatusBarTimeView *self, SEL sel, 
     return _SBStatusBarTimeView$drawRect$(self, sel, rect);
 }
 
-MSHook(void, SBIconController$appendIconList$, SBIconController *self, SEL sel, SBIconList *list) {
-    if (Debug_)
-        NSLog(@"appendIconList:%@", list);
-    return _SBIconController$appendIconList$(self, sel, list);
+@interface UIView (WinterBoard)
+- (bool) wb$isImageView;
+@end
+
+@implementation UIView (WinterBoard)
+
+- (bool) wb$isImageView {
+    return false;
+}
+
+@end
+
+@interface UIImageView (WinterBoard)
+- (bool) wb$isImageView;
+@end
+
+@implementation UIImageView (WinterBoard)
+
+- (bool) wb$isImageView {
+    return true;
+}
+
+@end
+
+MSHook(void, SBIconController$noteNumberOfIconListsChanged, SBIconController *self, SEL sel) {
+    SBIconModel *&_iconModel(MSHookIvar<SBIconModel *>(self, "_iconModel"));
+    NSArray *lists([_iconModel iconLists]);
+
+    for (unsigned i(0), e([lists count]); i != e; ++i)
+        if (NSString *path = $getTheme$([NSArray arrayWithObject:[NSString stringWithFormat:@"Page%u.png", i]])) {
+            SBIconList *list([lists objectAtIndex:i]);
+            NSArray *subviews([list subviews]);
+            UIImageView *view([subviews count] == 0 ? nil : [subviews objectAtIndex:0]);
+            if (view == nil || ![view wb$isImageView]) {
+                view = [[[UIImageView alloc] init] autorelease];
+                [list insertSubview:view atIndex:0];
+            }
+            UIImage *image([UIImage imageWithContentsOfFile:path]);
+            [view setImage:image];
+        }
+
+    return _SBIconController$noteNumberOfIconListsChanged(self, sel);
 }
 
 MSHook(id, SBIconLabel$initWithSize$label$, SBIconLabel *self, SEL sel, CGSize size, NSString *label) {
@@ -1241,7 +1280,7 @@ extern "C" void WBInitialize() {
         WBRename(SBCalendarIconContentsView, drawRect:, drawRect$);
         WBRename(SBContentLayer, initWithSize:, initWithSize$);
         WBRename(SBIconBadge, initWithBadge:, initWithBadge$);
-        WBRename(SBIconController, appendIconList:, appendIconList$);
+        WBRename(SBIconController, noteNumberOfIconListsChanged, noteNumberOfIconListsChanged);
         WBRename(SBWidgetApplicationIcon, icon, icon);
 
         WBRename(SBIconLabel, drawRect:, drawRect$);
