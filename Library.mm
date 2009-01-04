@@ -59,6 +59,7 @@
 #import <SpringBoard/SBContentLayer.h>
 #import <SpringBoard/SBIconController.h>
 #import <SpringBoard/SBIconLabel.h>
+#import <SpringBoard/SBIconList.h>
 #import <SpringBoard/SBIconModel.h>
 #import <SpringBoard/SBSlidingAlertDisplay.h>
 #import <SpringBoard/SBStatusBarContentsView.h>
@@ -101,6 +102,7 @@ Class $SBContentLayer;
 Class $SBIconBadge;
 Class $SBIconController;
 Class $SBIconLabel;
+Class $SBIconList;
 Class $SBIconModel;
 Class $SBSlidingAlertDisplay;
 Class $SBStatusBarContentsView;
@@ -856,28 +858,53 @@ MSHook(void, SBStatusBarTimeView$drawRect$, SBStatusBarTimeView *self, SEL sel, 
 }
 
 @interface UIView (WinterBoard)
-- (bool) wb$isImageView;
+- (bool) wb$isWBImageView;
 @end
 
 @implementation UIView (WinterBoard)
 
-- (bool) wb$isImageView {
+- (bool) wb$isWBImageView {
     return false;
 }
 
 @end
 
-@interface UIImageView (WinterBoard)
-- (bool) wb$isImageView;
+@interface WBImageView : UIImageView {
+}
+
+- (bool) wb$isWBImageView;
+- (void) wb$updateFrame;
 @end
 
-@implementation UIImageView (WinterBoard)
+@implementation WBImageView
 
-- (bool) wb$isImageView {
+- (bool) wb$isWBImageView {
     return true;
 }
 
+- (void) wb$updateFrame {
+    CGRect frame([self frame]);
+    frame.origin.y = 0;
+
+    for (UIView *view(self); ; ) {
+        view = [view superview];
+        if (view == nil)
+            break;
+        frame.origin.y -= [view frame].origin.y;
+    }
+
+    [self setFrame:frame];
+}
+
 @end
+
+MSHook(void, SBIconList$setFrame$, SBIconList *self, SEL sel, CGRect frame) {
+    NSArray *subviews([self subviews]);
+    WBImageView *view([subviews count] == 0 ? nil : [subviews objectAtIndex:0]);
+    if (view != nil && [view wb$isWBImageView])
+        [view wb$updateFrame];
+    _SBIconList$setFrame$(self, sel, frame);
+}
 
 MSHook(void, SBIconController$noteNumberOfIconListsChanged, SBIconController *self, SEL sel) {
     SBIconModel *&_iconModel(MSHookIvar<SBIconModel *>(self, "_iconModel"));
@@ -887,13 +914,16 @@ MSHook(void, SBIconController$noteNumberOfIconListsChanged, SBIconController *se
         if (NSString *path = $getTheme$([NSArray arrayWithObject:[NSString stringWithFormat:@"Page%u.png", i]])) {
             SBIconList *list([lists objectAtIndex:i]);
             NSArray *subviews([list subviews]);
-            UIImageView *view([subviews count] == 0 ? nil : [subviews objectAtIndex:0]);
-            if (view == nil || ![view wb$isImageView]) {
-                view = [[[UIImageView alloc] init] autorelease];
+
+            WBImageView *view([subviews count] == 0 ? nil : [subviews objectAtIndex:0]);
+            if (view == nil || ![view wb$isWBImageView]) {
+                view = [[[WBImageView alloc] init] autorelease];
                 [list insertSubview:view atIndex:0];
             }
+
             UIImage *image([UIImage imageWithContentsOfFile:path]);
             [view setImage:image];
+            [view wb$updateFrame];
         }
 
     return _SBIconController$noteNumberOfIconListsChanged(self, sel);
@@ -1263,6 +1293,7 @@ extern "C" void WBInitialize() {
         $SBIconBadge = objc_getClass("SBIconBadge");
         $SBIconController = objc_getClass("SBIconController");
         $SBIconLabel = objc_getClass("SBIconLabel");
+        $SBIconList = objc_getClass("SBIconList");
         $SBIconModel = objc_getClass("SBIconModel");
         $SBSlidingAlertDisplay = objc_getClass("SBSlidingAlertDisplay");
         $SBStatusBarContentsView = objc_getClass("SBStatusBarContentsView");
@@ -1286,6 +1317,8 @@ extern "C" void WBInitialize() {
         WBRename(SBIconLabel, drawRect:, drawRect$);
         WBRename(SBIconLabel, initWithSize:label:, initWithSize$label$);
         WBRename(SBIconLabel, setInDock:, setInDock$);
+
+        WBRename(SBIconList, setFrame:, setFrame$);
 
         WBRename(SBIconModel, cacheImageForIcon:, cacheImageForIcon$);
         WBRename(SBIconModel, getCachedImagedForIcon:, getCachedImagedForIcon$);
