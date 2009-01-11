@@ -53,6 +53,7 @@
 #import <SpringBoard/SBApplication.h>
 #import <SpringBoard/SBApplicationIcon.h>
 #import <SpringBoard/SBAppWindow.h>
+#import <SpringBoard/SBAwayView.h>
 #import <SpringBoard/SBBookmarkIcon.h>
 #import <SpringBoard/SBButtonBar.h>
 #import <SpringBoard/SBCalendarIconContentsView.h>
@@ -61,7 +62,6 @@
 #import <SpringBoard/SBIconLabel.h>
 #import <SpringBoard/SBIconList.h>
 #import <SpringBoard/SBIconModel.h>
-#import <SpringBoard/SBSlidingAlertDisplay.h>
 #import <SpringBoard/SBStatusBarContentsView.h>
 #import <SpringBoard/SBStatusBarController.h>
 #import <SpringBoard/SBStatusBarOperatorNameView.h>
@@ -95,6 +95,7 @@ Class $UIToolbar;
 
 Class $SBApplication;
 Class $SBApplicationIcon;
+Class $SBAwayView;
 Class $SBBookmarkIcon;
 Class $SBButtonBar;
 Class $SBCalendarIconContentsView;
@@ -104,7 +105,6 @@ Class $SBIconController;
 Class $SBIconLabel;
 Class $SBIconList;
 Class $SBIconModel;
-Class $SBSlidingAlertDisplay;
 Class $SBStatusBarContentsView;
 Class $SBStatusBarController;
 Class $SBStatusBarOperatorNameView;
@@ -688,14 +688,14 @@ MSHook(id, SBContentLayer$initWithSize$, SBContentLayer *self, SEL sel, CGSize s
     return self;
 }
 
-MSHook(void, SBSlidingAlertDisplay$updateDesktopImage$, SBSlidingAlertDisplay *self, SEL sel, UIImage *image) {
+MSHook(void, SBAwayView$updateDesktopImage$, SBAwayView *self, SEL sel, UIImage *image) {
     NSString *path = $getTheme$([NSArray arrayWithObject:@"LockBackground.html"]);
     UIView *&_backgroundView(MSHookIvar<UIView *>(self, "_backgroundView"));
 
     if (path != nil && _backgroundView != nil)
         path = nil;
 
-    _SBSlidingAlertDisplay$updateDesktopImage$(self, sel, image);
+    _SBAwayView$updateDesktopImage$(self, sel, image);
 
     if (path != nil) {
         CGRect bounds = [self bounds];
@@ -1286,6 +1286,7 @@ extern "C" void WBInitialize() {
 
         $SBApplication = objc_getClass("SBApplication");
         $SBApplicationIcon = objc_getClass("SBApplicationIcon");
+        $SBAwayView = objc_getClass("SBAwayView");
         $SBBookmarkIcon = objc_getClass("SBBookmarkIcon");
         $SBButtonBar = objc_getClass("SBButtonBar");
         $SBCalendarIconContentsView = objc_getClass("SBCalendarIconContentsView");
@@ -1295,7 +1296,6 @@ extern "C" void WBInitialize() {
         $SBIconLabel = objc_getClass("SBIconLabel");
         $SBIconList = objc_getClass("SBIconList");
         $SBIconModel = objc_getClass("SBIconModel");
-        $SBSlidingAlertDisplay = objc_getClass("SBSlidingAlertDisplay");
         $SBStatusBarContentsView = objc_getClass("SBStatusBarContentsView");
         $SBStatusBarController = objc_getClass("SBStatusBarController");
         $SBStatusBarOperatorNameView = objc_getClass("SBStatusBarOperatorNameView");
@@ -1323,7 +1323,7 @@ extern "C" void WBInitialize() {
         WBRename(SBIconModel, cacheImageForIcon:, cacheImageForIcon$);
         WBRename(SBIconModel, getCachedImagedForIcon:, getCachedImagedForIcon$);
 
-        WBRename(SBSlidingAlertDisplay, updateDesktopImage:, updateDesktopImage$);
+        WBRename(SBAwayView, updateDesktopImage:, updateDesktopImage$);
         WBRename(SBStatusBarContentsView, didMoveToSuperview, didMoveToSuperview);
         WBRename(SBStatusBarContentsView, initWithStatusBar:mode:, initWithStatusBar$mode$);
         WBRename(SBStatusBarController, setStatusBarMode:orientation:duration:fenceID:animation:, setStatusBarMode$orientation$duration$fenceID$animation$);
