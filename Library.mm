@@ -62,6 +62,7 @@
 #import <SpringBoard/SBIconLabel.h>
 #import <SpringBoard/SBIconList.h>
 #import <SpringBoard/SBIconModel.h>
+#import <SpringBoard/SBImageCache.h>
 #import <SpringBoard/SBStatusBarContentsView.h>
 #import <SpringBoard/SBStatusBarController.h>
 #import <SpringBoard/SBStatusBarOperatorNameView.h>
@@ -105,6 +106,7 @@ Class $SBIconController;
 Class $SBIconLabel;
 Class $SBIconList;
 Class $SBIconModel;
+//Class $SBImageCache;
 Class $SBStatusBarContentsView;
 Class $SBStatusBarController;
 Class $SBStatusBarOperatorNameView;
@@ -305,27 +307,42 @@ static NSString *$pathForIcon$(SBApplication *self) {
 
 @end
 
+UIImage *$cacheForImage$(UIImage *image) {
+    CGColorSpaceRef space(CGColorSpaceCreateDeviceRGB());
+    CGRect rect = {CGPointMake(1, 1), [image size]};
+    CGSize size = {rect.size.width + 2, rect.size.height + 2};
+
+    CGContextRef context(CGBitmapContextCreate(NULL, size.width, size.height, 8, 4 * size.width, space, kCGBitmapByteOrder32Little | kCGImageAlphaPremultipliedFirst));
+    CGColorSpaceRelease(space);
+
+    CGContextDrawImage(context, rect, [image CGImage]);
+    CGImageRef ref(CGBitmapContextCreateImage(context));
+    CGContextRelease(context);
+
+    UIImage *cache([UIImage imageWithCGImage:ref]);
+    CGImageRelease(ref);
+
+    return cache;
+}
+
+/*MSHook(id, SBImageCache$initWithName$forImageWidth$imageHeight$initialCapacity$, SBImageCache *self, SEL sel, NSString *name, unsigned width, unsigned height, unsigned capacity) {
+    //if ([name isEqualToString:@"icons"]) return nil;
+    return _SBImageCache$initWithName$forImageWidth$imageHeight$initialCapacity$(self, sel, name, width, height, capacity);
+}*/
+
 MSHook(void, SBIconModel$cacheImageForIcon$, SBIconModel *self, SEL sel, SBIcon *icon) {
-    _SBIconModel$cacheImageForIcon$(self, sel, icon);
     NSString *key([icon displayIdentifier]);
 
     if (UIImage *image = [icon icon]) {
-        CGColorSpaceRef space(CGColorSpaceCreateDeviceRGB());
-        CGRect rect = {CGPointMake(1, 1), [image size]};
-        CGSize size = {rect.size.width + 2, rect.size.height + 2};
-
-        CGContextRef context(CGBitmapContextCreate(NULL, size.width, size.height, 8, 4 * size.width, space, kCGBitmapByteOrder32Little | kCGImageAlphaPremultipliedFirst));
-        CGColorSpaceRelease(space);
-
-        CGContextDrawImage(context, rect, [image CGImage]);
-        CGImageRef ref(CGBitmapContextCreateImage(context));
-        CGContextRelease(context);
-
-        UIImage *image([UIImage imageWithCGImage:ref]);
-        CGImageRelease(ref);
-
-        [Cache_ setObject:image forKey:key];
+        CGSize size = [image size];
+        if (size.width > 59 || size.height > 60) {
+            UIImage *cache($cacheForImage$(image));
+            [Cache_ setObject:cache forKey:key];
+            return;
+        }
     }
+
+    _SBIconModel$cacheImageForIcon$(self, sel, icon);
 }
 
 MSHook(UIImage *, SBIconModel$getCachedImagedForIcon$, SBIconModel *self, SEL sel, SBIcon *icon) {
@@ -1105,7 +1122,6 @@ MSHook(bool, _Z24GetFileNameForThisActionmPcRb, unsigned long a0, char *a1, bool
         NSString *path = [NSString stringWithUTF8String:a1];
         if ([path hasPrefix:@"/System/Library/Audio/UISounds/"]) {
             NSString *file = [path substringFromIndex:31];
-            NSLog(@"%@", file);
             for (NSString *theme in themes_) {
                 NSString *path([NSString stringWithFormat:@"%@/UISounds/%@", theme, file]);
                 if ([Manager_ fileExistsAtPath:path]) {
@@ -1262,10 +1278,12 @@ extern "C" void WBInitialize() {
     Info_ = [[NSMutableDictionary dictionaryWithCapacity:16] retain];
 
     for (NSString *theme in themes_)
-        if (NSDictionary *info = [[NSDictionary alloc] initWithContentsOfFile:[NSString stringWithFormat:@"%@/Info.plist", theme]])
+        if (NSDictionary *info = [[NSDictionary alloc] initWithContentsOfFile:[NSString stringWithFormat:@"%@/Info.plist", theme]]) {
+            [info autorelease];
             for (NSString *key in [info allKeys])
                 if ([Info_ objectForKey:key] == nil)
                     [Info_ setObject:[info objectForKey:key] forKey:key];
+        }
 
     if ([identifier isEqualToString:@"com.apple.MobileSMS"]) {
         Class mSMSMessageTranscriptController = objc_getClass("mSMSMessageTranscriptController");
@@ -1296,6 +1314,7 @@ extern "C" void WBInitialize() {
         $SBIconLabel = objc_getClass("SBIconLabel");
         $SBIconList = objc_getClass("SBIconList");
         $SBIconModel = objc_getClass("SBIconModel");
+        //$SBImageCache = objc_getClass("SBImageCache");
         $SBStatusBarContentsView = objc_getClass("SBStatusBarContentsView");
         $SBStatusBarController = objc_getClass("SBStatusBarController");
         $SBStatusBarOperatorNameView = objc_getClass("SBStatusBarOperatorNameView");
@@ -1323,6 +1342,8 @@ extern "C" void WBInitialize() {
         WBRename(SBIconModel, cacheImageForIcon:, cacheImageForIcon$);
         WBRename(SBIconModel, getCachedImagedForIcon:, getCachedImagedForIcon$);
 
+        //WBRename(SBImageCache, initWithName:forImageWidth:imageHeight:initialCapacity:, initWithName$forImageWidth$imageHeight$initialCapacity$);
+
         WBRename(SBAwayView, updateDesktopImage:, updateDesktopImage$);
         WBRename(SBStatusBarContentsView, didMoveToSuperview, didMoveToSuperview);
         WBRename(SBStatusBarContentsView, initWithStatusBar:mode:, initWithStatusBar$mode$);
@@ -1332,11 +1353,11 @@ extern "C" void WBInitialize() {
         WBRename(SBStatusBarTimeView, drawRect:, drawRect$);
 
         English_ = [[NSDictionary alloc] initWithContentsOfFile:@"/System/Library/CoreServices/SpringBoard.app/English.lproj/LocalizedApplicationNames.strings"];
-        if (English_ != nil)
-            English_ = [English_ retain];
-
         Cache_ = [[NSMutableDictionary alloc] initWithCapacity:64];
     }
+
+        [pool release];
+        return;
 
     Wallpapers_ = [[NSArray arrayWithObjects:@"Wallpaper.mp4", @"Wallpaper.png", @"Wallpaper.jpg", @"Wallpaper.html", nil] retain];
 
