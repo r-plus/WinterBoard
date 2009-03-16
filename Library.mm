@@ -1356,9 +1356,6 @@ extern "C" void WBInitialize() {
         Cache_ = [[NSMutableDictionary alloc] initWithCapacity:64];
     }
 
-        [pool release];
-        return;
-
     Wallpapers_ = [[NSArray arrayWithObjects:@"Wallpaper.mp4", @"Wallpaper.png", @"Wallpaper.jpg", @"Wallpaper.html", nil] retain];
 
     if ([Info_ objectForKey:@"UndockedIconLabels"] == nil)
