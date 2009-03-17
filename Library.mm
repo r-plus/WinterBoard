@@ -101,6 +101,7 @@ Class $SBBookmarkIcon;
 Class $SBButtonBar;
 Class $SBCalendarIconContentsView;
 Class $SBContentLayer;
+Class $SBIcon;
 Class $SBIconBadge;
 Class $SBIconController;
 Class $SBIconLabel;
@@ -335,7 +336,7 @@ MSHook(void, SBIconModel$cacheImageForIcon$, SBIconModel *self, SEL sel, SBIcon 
 
     if (UIImage *image = [icon icon]) {
         CGSize size = [image size];
-        if (size.width > 59 || size.height > 60) {
+        if (size.width != 59 || size.height != 60) {
             UIImage *cache($cacheForImage$(image));
             [Cache_ setObject:cache forKey:key];
             return;
@@ -827,6 +828,12 @@ WBDelegate(badge_)
 @end
 /* }}} */
 
+MSHook(void, SBIcon$setAlpha$, SBIcon *self, SEL sel, float alpha) {
+    if (NSNumber *number = [Info_ objectForKey:@"IconAlpha"])
+        alpha = [number floatValue];
+    return _SBIcon$setAlpha$(self, sel, alpha);
+}
+
 MSHook(id, SBIconBadge$initWithBadge$, SBIconBadge *self, SEL sel, NSString *badge) {
     if ((self = _SBIconBadge$initWithBadge$(self, sel, badge)) != nil) {
         id &_badge(MSHookIvar<id>(self, "_badge"));
@@ -1309,6 +1316,7 @@ extern "C" void WBInitialize() {
         $SBButtonBar = objc_getClass("SBButtonBar");
         $SBCalendarIconContentsView = objc_getClass("SBCalendarIconContentsView");
         $SBContentLayer = objc_getClass("SBContentLayer");
+        $SBIcon = objc_getClass("SBIcon");
         $SBIconBadge = objc_getClass("SBIconBadge");
         $SBIconController = objc_getClass("SBIconController");
         $SBIconLabel = objc_getClass("SBIconLabel");
@@ -1329,6 +1337,7 @@ extern "C" void WBInitialize() {
         WBRename(SBButtonBar, didMoveToSuperview, didMoveToSuperview);
         WBRename(SBCalendarIconContentsView, drawRect:, drawRect$);
         WBRename(SBContentLayer, initWithSize:, initWithSize$);
+        WBRename(SBIcon, setAlpha:, setAlpha$);
         WBRename(SBIconBadge, initWithBadge:, initWithBadge$);
         WBRename(SBIconController, noteNumberOfIconListsChanged, noteNumberOfIconListsChanged);
         WBRename(SBWidgetApplicationIcon, icon, icon);
