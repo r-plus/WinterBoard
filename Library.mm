@@ -35,7 +35,26 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#define _trace() NSLog(@"WB:_trace(%u)", __LINE__);
+#include <sys/time.h>
+
+struct timeval _ltv;
+bool _itv;
+
+#define _trace() do { \
+    struct timeval _ctv; \
+    gettimeofday(&_ctv, NULL); \
+    if (!_itv) { \
+        _itv = true; \
+        _ltv = _ctv; \
+    } \
+    fprintf(stderr, "%lu.%.6u[%f]:_trace()@%s:%u[%s]\n", \
+        _ctv.tv_sec, _ctv.tv_usec, \
+        (_ctv.tv_sec - _ltv.tv_sec) + (_ctv.tv_usec - _ltv.tv_usec) / 1000000.0, \
+        __FILE__, __LINE__, __FUNCTION__\
+    ); \
+    _ltv = _ctv; \
+} while (false)
+
 #define _transient
 
 #import <CoreFoundation/CoreFoundation.h>
@@ -57,7 +76,6 @@
 #import <SpringBoard/SBBookmarkIcon.h>
 #import <SpringBoard/SBButtonBar.h>
 #import <SpringBoard/SBCalendarIconContentsView.h>
-#import <SpringBoard/SBContentLayer.h>
 #import <SpringBoard/SBIconController.h>
 #import <SpringBoard/SBIconLabel.h>
 #import <SpringBoard/SBIconList.h>
@@ -100,7 +118,6 @@ Class $SBAwayView;
 Class $SBBookmarkIcon;
 Class $SBButtonBar;
 Class $SBCalendarIconContentsView;
-Class $SBContentLayer;
 Class $SBIcon;
 Class $SBIconBadge;
 Class $SBIconController;
@@ -112,6 +129,7 @@ Class $SBStatusBarContentsView;
 Class $SBStatusBarController;
 Class $SBStatusBarOperatorNameView;
 Class $SBStatusBarTimeView;
+Class $SBUIController;
 Class $SBWidgetApplicationIcon;
 
 @interface NSDictionary (WinterBoard)
@@ -145,7 +163,6 @@ static UIImage *(*_UIImageAtPath)(NSString *name, NSBundle *path);
 static CGImageRef (*_UIImageRefAtPath)(NSString *name, bool cache, UIImageOrientation *orientation);
 static UIImage *(*_UIImageWithNameInDomain)(NSString *name, NSString *domain);
 static NSBundle *(*_UIKitBundle)();
-static void (*_UISharedImageInitialize)(bool);
 static int (*_UISharedImageNameGetIdentifier)(NSString *);
 static UIImage *(*_UISharedImageWithIdentifier)(int);
 
@@ -263,6 +280,7 @@ static NSString *$pathForIcon$(SBApplication *self) {
     path = [path stringByDeletingLastPathComponent];
     if (path == nil || [path length] == 0 || [path isEqualToString:@"/"])
         return nil;
+    return [NSBundle mainBundle];
 
     NSBundle *bundle([Bundles_ objectForKey:path]);
     if (reinterpret_cast<id>(bundle) == [NSNull null])
@@ -274,7 +292,7 @@ static NSString *$pathForIcon$(SBApplication *self) {
             bundle = [NSBundle wb$bundleWithFile:path];
         if (Debug_)
             NSLog(@"WB:Debug:PathBundle(%@, %@)", path, bundle);
-        [Bundles_ setObject:(bundle == nil ? [NSNull null] : reinterpret_cast<id>(bundle)) forKey:path];
+        //[Bundles_ setObject:(bundle == nil ? [NSNull null] : reinterpret_cast<id>(bundle)) forKey:path];
     }
 
     return bundle;
@@ -293,6 +311,7 @@ static NSString *$pathForIcon$(SBApplication *self) {
         NSLog(@"WB:Debug:Bypass(\"%@\")", self);
 
     if (NSBundle *bundle = [NSBundle wb$bundleWithFile:self]) {
+        return self;
         NSString *file([self stringByResolvingSymlinksInPath]);
         NSString *prefix([[bundle bundlePath] stringByResolvingSymlinksInPath]);
         if ([file hasPrefix:prefix]) {
@@ -398,7 +417,7 @@ static UIImage *CachedImageAtPath(NSString *path) {
 MSHook(CGImageRef, _UIImageRefAtPath, NSString *name, bool cache, UIImageOrientation *orientation) {
     if (Debug_)
         NSLog(@"WB:Debug: _UIImageRefAtPath(\"%@\", %s)", name, cache ? "true" : "false");
-    return __UIImageRefAtPath([name wb$themedPath], cache, orientation);
+    return __UIImageRefAtPath(([name wb$themedPath], name), cache, orientation);
 }
 
 /*MSHook(UIImage *, _UIImageAtPath, NSString *name, NSBundle *bundle) {
@@ -528,7 +547,7 @@ MSHook(void, SBCalendarIconContentsView$drawRect$, SBCalendarIconContentsView *s
 }
 
 /*static id UINavigationBarBackground$initWithFrame$withBarStyle$withTintColor$(UINavigationBarBackground<WinterBoard> *self, SEL sel, CGRect frame, int style, UIColor *tint) {
-    _trace();
+_trace();
 
     if (NSNumber *number = [Info_ objectForKey:@"NavigationBarStyle"])
         style = [number intValue];
@@ -595,10 +614,26 @@ static NSURL *WallpaperURL_;
         object = nil; \
     } while (false)
 
-MSHook(id, SBContentLayer$initWithSize$, SBContentLayer *self, SEL sel, CGSize size) {
-    self = _SBContentLayer$initWithSize$(self, sel, size);
+void DumpHierarchy(UIView *view, unsigned index = 0, unsigned indent = 0) {
+    NSLog(@"%*s|%2d:%s", indent * 3, "", index, class_getName([view class]));
+    index = 0;
+    for (UIView *child in [view subviews])
+        DumpHierarchy(child, index++, indent + 1);
+}
+
+MSHook(id, SBUIController$init, SBUIController *self, SEL sel) {
+    self = _SBUIController$init(self, sel);
     if (self == nil)
         return nil;
+
+    UIWindow *&_window(MSHookIvar<UIWindow *>(self, "_window"));
+    UIView *&_contentView(MSHookIvar<UIView *>(self, "_contentView"));
+
+    UIView *content([[[UIView alloc] initWithFrame:[_contentView frame]] autorelease]);
+    [content setBackgroundColor:[_contentView backgroundColor]];
+    [_contentView setBackgroundColor:[UIColor clearColor]];
+    [_contentView setFrame:[content bounds]];
+    [_window setContentView:content];
 
     _release(WallpaperFile_);
     _release(WallpaperImage_);
@@ -619,7 +654,7 @@ MSHook(id, SBContentLayer$initWithSize$, SBContentLayer *self, SEL sel, CGSize s
 
             AVQueue *queue([controller_ queue]);
 
-            UIView *video([[[UIView alloc] initWithFrame:[self bounds]] autorelease]);
+            UIView *video([[[UIView alloc] initWithFrame:[_contentView bounds]] autorelease]);
             [controller_ setLayer:[video _layer]];
 
             AVItem *item([[[AVItem alloc] initWithPath:mp4 error:&error] autorelease]);
@@ -632,14 +667,14 @@ MSHook(id, SBContentLayer$initWithSize$, SBContentLayer *self, SEL sel, CGSize s
 	    controller.movieControlMode = MPMovieControlModeHidden;
 	    [controller play];
 #else
-            MPVideoView *video = [[[$MPVideoView alloc] initWithFrame:[self bounds]] autorelease];
+            MPVideoView *video = [[[$MPVideoView alloc] initWithFrame:[_contentView bounds]] autorelease];
             [video setMovieWithPath:mp4];
             [video setRepeatMode:1];
             [video setRepeatGap:-1];
             [video playFromBeginning];;
 #endif
 
-            [self addSubview:video];
+            [content addSubview:video];
         }
 
         NSString *png = [theme stringByAppendingPathComponent:@"Wallpaper.png"];
@@ -662,12 +697,12 @@ MSHook(id, SBContentLayer$initWithSize$, SBContentLayer *self, SEL sel, CGSize s
         if (image != nil) {
             WallpaperFile_ = [path retain];
             WallpaperImage_ = [[UIImageView alloc] initWithImage:image];
-            [self addSubview:WallpaperImage_];
+            [content addSubview:WallpaperImage_];
         }
 
         NSString *html = [theme stringByAppendingPathComponent:@"Wallpaper.html"];
         if ([Manager_ fileExistsAtPath:html]) {
-            CGRect bounds = [self bounds];
+            CGRect bounds = [content bounds];
 
             UIWebDocumentView *view([[[UIWebDocumentView alloc] initWithFrame:bounds] autorelease]);
             [view setAutoresizes:true];
@@ -680,7 +715,7 @@ MSHook(id, SBContentLayer$initWithSize$, SBContentLayer *self, SEL sel, CGSize s
             [[view webView] setDrawsBackground:false];
             [view setBackgroundColor:[UIColor clearColor]];
 
-            [self addSubview:view];
+            [content addSubview:view];
         }
     }
 
@@ -688,7 +723,7 @@ MSHook(id, SBContentLayer$initWithSize$, SBContentLayer *self, SEL sel, CGSize s
         NSString *theme = [themes_ objectAtIndex:(e - i - 1)];
         NSString *html = [theme stringByAppendingPathComponent:@"Widget.html"];
         if ([Manager_ fileExistsAtPath:html]) {
-            CGRect bounds = [self bounds];
+            CGRect bounds = [content bounds];
 
             UIWebDocumentView *view([[[UIWebDocumentView alloc] initWithFrame:bounds] autorelease]);
             [view setAutoresizes:true];
@@ -699,9 +734,12 @@ MSHook(id, SBContentLayer$initWithSize$, SBContentLayer *self, SEL sel, CGSize s
             [[view webView] setDrawsBackground:false];
             [view setBackgroundColor:[UIColor clearColor]];
 
-            [self addSubview:view];
+            [content addSubview:view];
         }
     }
+
+    [content addSubview:_contentView];
+    DumpHierarchy(_window);
 
     return self;
 }
@@ -843,20 +881,38 @@ MSHook(id, SBIconBadge$initWithBadge$, SBIconBadge *self, SEL sel, NSString *bad
     } return self;
 }
 
-MSHook(void, SBStatusBarController$setStatusBarMode$orientation$duration$fenceID$animation$, SBStatusBarController *self, SEL sel, int mode, int orientation, float duration, int id, int animation) {
+void SBStatusBarController$setStatusBarMode(int &mode) {
     if (Debug_)
         NSLog(@"WB:Debug:setStatusBarMode:%d", mode);
     if (mode < 100) // 104:hidden 105:glowing
         if (NSNumber *number = [Info_ objectForKey:@"StatusBarMode"])
             mode = [number intValue];
-    return _SBStatusBarController$setStatusBarMode$orientation$duration$fenceID$animation$(self, sel, mode, orientation, duration, id, animation);
 }
 
-MSHook(id, SBStatusBarContentsView$initWithStatusBar$mode$, SBStatusBarContentsView *self, SEL sel, id bar, int mode) {
+/*MSHook(void, SBStatusBarController$setStatusBarMode$orientation$duration$animation$, SBStatusBarController *self, SEL sel, int mode, int orientation, double duration, int animation) {
+    NSLog(@"mode:%d orientation:%d duration:%f animation:%d", mode, orientation, duration, animation);
+    SBStatusBarController$setStatusBarMode(mode);
+    return _SBStatusBarController$setStatusBarMode$orientation$duration$animation$(self, sel, mode, orientation, duration, animation);
+}*/
+
+MSHook(void, SBStatusBarController$setStatusBarMode$orientation$duration$fenceID$animation$, SBStatusBarController *self, SEL sel, int mode, int orientation, float duration, int fenceID, int animation) {
+    NSLog(@"mode:%d orientation:%d duration:%f fenceID:%d animation:%d", mode, orientation, duration, fenceID, animation);
+    SBStatusBarController$setStatusBarMode(mode);
+    return _SBStatusBarController$setStatusBarMode$orientation$duration$fenceID$animation$(self, sel, mode, orientation, duration, fenceID, animation);
+}
+
+MSHook(void, SBStatusBarController$setStatusBarMode$orientation$duration$fenceID$animation$startTime$, SBStatusBarController *self, SEL sel, int mode, int orientation, double duration, int fenceID, int animation, double startTime) {
+    NSLog(@"mode:%d orientation:%d duration:%f fenceID:%d animation:%d startTime:%f", mode, orientation, duration, fenceID, animation, startTime);
+    SBStatusBarController$setStatusBarMode(mode);
+    NSLog(@"mode=%u", mode);
+    return _SBStatusBarController$setStatusBarMode$orientation$duration$fenceID$animation$startTime$(self, sel, mode, orientation, duration, fenceID, animation, startTime);
+}
+
+/*MSHook(id, SBStatusBarContentsView$initWithStatusBar$mode$, SBStatusBarContentsView *self, SEL sel, id bar, int mode) {
     if (NSNumber *number = [Info_ objectForKey:@"StatusBarContentsMode"])
         mode = [number intValue];
     return _SBStatusBarContentsView$initWithStatusBar$mode$(self, sel, bar, mode);
-}
+}*/
 
 MSHook(NSString *, SBStatusBarOperatorNameView$operatorNameStyle, SBStatusBarOperatorNameView *self, SEL sel) {
     NSString *style(_SBStatusBarOperatorNameView$operatorNameStyle(self, sel));
@@ -1175,7 +1231,7 @@ extern "C" void WBInitialize() {
 
     NSLog(@"WB:Notice: WinterBoard");
 
-    struct nlist nl[9];
+    struct nlist nl[8];
     memset(nl, 0, sizeof(nl));
 
     nl[0].n_un.n_name = (char *) "__UIApplicationImageWithName";
@@ -1183,9 +1239,8 @@ extern "C" void WBInitialize() {
     nl[2].n_un.n_name = (char *) "__UIImageRefAtPath";
     nl[3].n_un.n_name = (char *) "__UIImageWithNameInDomain";
     nl[4].n_un.n_name = (char *) "__UIKitBundle";
-    nl[5].n_un.n_name = (char *) "__UISharedImageInitialize";
-    nl[6].n_un.n_name = (char *) "__UISharedImageNameGetIdentifier";
-    nl[7].n_un.n_name = (char *) "__UISharedImageWithIdentifier";
+    nl[5].n_un.n_name = (char *) "__UISharedImageNameGetIdentifier";
+    nl[6].n_un.n_name = (char *) "__UISharedImageWithIdentifier";
 
     nlist(UIKit, nl);
 
@@ -1194,9 +1249,8 @@ extern "C" void WBInitialize() {
     _UIImageRefAtPath = (CGImageRef (*)(NSString *, bool, UIImageOrientation *)) nl[2].n_value;
     _UIImageWithNameInDomain = (UIImage *(*)(NSString *, NSString *)) nl[3].n_value;
     _UIKitBundle = (NSBundle *(*)()) nl[4].n_value;
-    _UISharedImageInitialize = (void (*)(bool)) nl[5].n_value;
-    _UISharedImageNameGetIdentifier = (int (*)(NSString *)) nl[6].n_value;
-    _UISharedImageWithIdentifier = (UIImage *(*)(int)) nl[7].n_value;
+    _UISharedImageNameGetIdentifier = (int (*)(NSString *)) nl[5].n_value;
+    _UISharedImageWithIdentifier = (UIImage *(*)(int)) nl[6].n_value;
 
     MSHookFunction(_UIApplicationImageWithName, &$_UIApplicationImageWithName, &__UIApplicationImageWithName);
     MSHookFunction(_UIImageRefAtPath, &$_UIImageRefAtPath, &__UIImageRefAtPath);
@@ -1230,8 +1284,6 @@ extern "C" void WBInitialize() {
 
     _UINavigationBar$setBarStyle$ = MSHookMessage($UINavigationBar, @selector(setBarStyle:), &$UINavigationBar$setBarStyle$);
     _UIToolbar$setBarStyle$ = MSHookMessage($UIToolbar, @selector(setBarStyle:), &$UIToolbar$setBarStyle$);
-
-    _UISharedImageInitialize(false);
 
     Manager_ = [[NSFileManager defaultManager] retain];
     UIImages_ = [[NSMutableDictionary alloc] initWithCapacity:16];
@@ -1315,7 +1367,6 @@ extern "C" void WBInitialize() {
         $SBBookmarkIcon = objc_getClass("SBBookmarkIcon");
         $SBButtonBar = objc_getClass("SBButtonBar");
         $SBCalendarIconContentsView = objc_getClass("SBCalendarIconContentsView");
-        $SBContentLayer = objc_getClass("SBContentLayer");
         $SBIcon = objc_getClass("SBIcon");
         $SBIconBadge = objc_getClass("SBIconBadge");
         $SBIconController = objc_getClass("SBIconController");
@@ -1327,6 +1378,7 @@ extern "C" void WBInitialize() {
         $SBStatusBarController = objc_getClass("SBStatusBarController");
         $SBStatusBarOperatorNameView = objc_getClass("SBStatusBarOperatorNameView");
         $SBStatusBarTimeView = objc_getClass("SBStatusBarTimeView");
+        $SBUIController = objc_getClass("SBUIController");
         $SBWidgetApplicationIcon = objc_getClass("SBWidgetApplicationIcon");
 
         WBRename(WebCoreFrameBridge, renderedSizeOfNode:constrainedToWidth:, renderedSizeOfNode$constrainedToWidth$);
@@ -1336,10 +1388,10 @@ extern "C" void WBInitialize() {
         WBRename(SBBookmarkIcon, icon, icon);
         WBRename(SBButtonBar, didMoveToSuperview, didMoveToSuperview);
         WBRename(SBCalendarIconContentsView, drawRect:, drawRect$);
-        WBRename(SBContentLayer, initWithSize:, initWithSize$);
         WBRename(SBIcon, setAlpha:, setAlpha$);
         WBRename(SBIconBadge, initWithBadge:, initWithBadge$);
         WBRename(SBIconController, noteNumberOfIconListsChanged, noteNumberOfIconListsChanged);
+        WBRename(SBUIController, init, init);
         WBRename(SBWidgetApplicationIcon, icon, icon);
 
         WBRename(SBIconLabel, drawRect:, drawRect$);
@@ -1355,8 +1407,10 @@ extern "C" void WBInitialize() {
 
         WBRename(SBAwayView, updateDesktopImage:, updateDesktopImage$);
         WBRename(SBStatusBarContentsView, didMoveToSuperview, didMoveToSuperview);
-        WBRename(SBStatusBarContentsView, initWithStatusBar:mode:, initWithStatusBar$mode$);
+        //WBRename(SBStatusBarContentsView, initWithStatusBar:mode:, initWithStatusBar$mode$);
+        //WBRename(SBStatusBarController, setStatusBarMode:orientation:duration:animation:, setStatusBarMode$orientation$duration$animation$);
         WBRename(SBStatusBarController, setStatusBarMode:orientation:duration:fenceID:animation:, setStatusBarMode$orientation$duration$fenceID$animation$);
+        WBRename(SBStatusBarController, setStatusBarMode:orientation:duration:fenceID:animation:startTime:, setStatusBarMode$orientation$duration$fenceID$animation$startTime$);
         WBRename(SBStatusBarOperatorNameView, operatorNameStyle, operatorNameStyle);
         WBRename(SBStatusBarOperatorNameView, setOperatorName:fullSize:, setOperatorName$fullSize$);
         WBRename(SBStatusBarTimeView, drawRect:, drawRect$);
