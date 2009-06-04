@@ -280,7 +280,6 @@ static NSString *$pathForIcon$(SBApplication *self) {
     path = [path stringByDeletingLastPathComponent];
     if (path == nil || [path length] == 0 || [path isEqualToString:@"/"])
         return nil;
-    return [NSBundle mainBundle];
 
     NSBundle *bundle([Bundles_ objectForKey:path]);
     if (reinterpret_cast<id>(bundle) == [NSNull null])
@@ -292,7 +291,7 @@ static NSString *$pathForIcon$(SBApplication *self) {
             bundle = [NSBundle wb$bundleWithFile:path];
         if (Debug_)
             NSLog(@"WB:Debug:PathBundle(%@, %@)", path, bundle);
-        //[Bundles_ setObject:(bundle == nil ? [NSNull null] : reinterpret_cast<id>(bundle)) forKey:path];
+        [Bundles_ setObject:(bundle == nil ? [NSNull null] : reinterpret_cast<id>(bundle)) forKey:path];
     }
 
     return bundle;
@@ -311,7 +310,6 @@ static NSString *$pathForIcon$(SBApplication *self) {
         NSLog(@"WB:Debug:Bypass(\"%@\")", self);
 
     if (NSBundle *bundle = [NSBundle wb$bundleWithFile:self]) {
-        return self;
         NSString *file([self stringByResolvingSymlinksInPath]);
         NSString *prefix([[bundle bundlePath] stringByResolvingSymlinksInPath]);
         if ([file hasPrefix:prefix]) {
@@ -417,7 +415,7 @@ static UIImage *CachedImageAtPath(NSString *path) {
 MSHook(CGImageRef, _UIImageRefAtPath, NSString *name, bool cache, UIImageOrientation *orientation) {
     if (Debug_)
         NSLog(@"WB:Debug: _UIImageRefAtPath(\"%@\", %s)", name, cache ? "true" : "false");
-    return __UIImageRefAtPath(([name wb$themedPath], name), cache, orientation);
+    return __UIImageRefAtPath([name wb$themedPath], cache, orientation);
 }
 
 /*MSHook(UIImage *, _UIImageAtPath, NSString *name, NSBundle *bundle) {
@@ -501,7 +499,7 @@ MSHook(void, SBCalendarIconContentsView$drawRect$, SBCalendarIconContentsView *s
 
     CFDateFormatterSetFormat(formatter, (CFStringRef) [bundle localizedStringForKey:@"CALENDAR_ICON_DAY_NUMBER_FORMAT" value:@"" table:@"SpringBoard"]);
     CFStringRef date(CFDateFormatterCreateStringWithDate(NULL, formatter, now));
-    CFDateFormatterSetFormat(formatter, (CFStringRef) [bundle localizedStringForKey:@"CALENDAR_ICON_DAY_NAME_FORMAT" value:@"" table:@"SpringBoard"]);
+    CFDateFormatterSetFormat(formatter, (CFStringRef) [bundle localizedStringForKey:@"CALENDAR_ICON_DAY_NAME_FORMAT" value:@"cccc" table:@"SpringBoard"]);
     CFStringRef day(CFDateFormatterCreateStringWithDate(NULL, formatter, now));
 
     CFRelease(now);
@@ -627,12 +625,21 @@ MSHook(id, SBUIController$init, SBUIController *self, SEL sel) {
         return nil;
 
     UIWindow *&_window(MSHookIvar<UIWindow *>(self, "_window"));
+    UIView *&_contentLayer(MSHookIvar<UIView *>(self, "_contentLayer"));
     UIView *&_contentView(MSHookIvar<UIView *>(self, "_contentView"));
 
-    UIView *content([[[UIView alloc] initWithFrame:[_contentView frame]] autorelease]);
-    [content setBackgroundColor:[_contentView backgroundColor]];
-    [_contentView setBackgroundColor:[UIColor clearColor]];
-    [_contentView setFrame:[content bounds]];
+    UIView *layer;
+    if (&_contentLayer != NULL)
+        layer = _contentLayer;
+    else if (&_contentView != NULL)
+        layer = _contentView;
+    else
+        layer = nil;
+
+    UIView *content([[[UIView alloc] initWithFrame:[layer frame]] autorelease]);
+    [content setBackgroundColor:[layer backgroundColor]];
+    [layer setBackgroundColor:[UIColor clearColor]];
+    [layer setFrame:[content bounds]];
     [_window setContentView:content];
 
     _release(WallpaperFile_);
@@ -654,7 +661,7 @@ MSHook(id, SBUIController$init, SBUIController *self, SEL sel) {
 
             AVQueue *queue([controller_ queue]);
 
-            UIView *video([[[UIView alloc] initWithFrame:[_contentView bounds]] autorelease]);
+            UIView *video([[[UIView alloc] initWithFrame:[content bounds]] autorelease]);
             [controller_ setLayer:[video _layer]];
 
             AVItem *item([[[AVItem alloc] initWithPath:mp4 error:&error] autorelease]);
@@ -667,7 +674,7 @@ MSHook(id, SBUIController$init, SBUIController *self, SEL sel) {
 	    controller.movieControlMode = MPMovieControlModeHidden;
 	    [controller play];
 #else
-            MPVideoView *video = [[[$MPVideoView alloc] initWithFrame:[_contentView bounds]] autorelease];
+            MPVideoView *video = [[[$MPVideoView alloc] initWithFrame:[content bounds]] autorelease];
             [video setMovieWithPath:mp4];
             [video setRepeatMode:1];
             [video setRepeatGap:-1];
@@ -738,7 +745,7 @@ MSHook(id, SBUIController$init, SBUIController *self, SEL sel) {
         }
     }
 
-    [content addSubview:_contentView];
+    [content addSubview:layer];
     DumpHierarchy(_window);
 
     return self;
@@ -802,6 +809,10 @@ extern "C" NSString *UIStyleStringFromColor(CGColorRef);*/
     time_ = [time retain];
     view_ = view;
     return self;
+}
+
+- (NSString *) description {
+    return time_;
 }
 
 WBDelegate(time_)
