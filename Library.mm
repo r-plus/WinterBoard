@@ -155,6 +155,10 @@ Class $SBWidgetApplicationIcon;
 
 @end
 
+static BOOL (*_GSFontGetUseLegacyFontMetrics)();
+#define $GSFontGetUseLegacyFontMetrics() \
+    (_GSFontGetUseLegacyFontMetrics == NULL ? YES : _GSFontGetUseLegacyFontMetrics())
+
 bool Debug_ = false;
 bool Engineer_ = false;
 
@@ -532,8 +536,10 @@ MSHook(void, SBCalendarIconContentsView$drawRect$, SBCalendarIconContentsView *s
     CGSize datesize = [(NSString *)date sizeWithStyle:datestyle forWidth:(width + leeway)];
     CGSize daysize = [(NSString *)day sizeWithStyle:daystyle forWidth:(width + leeway)];
 
+    unsigned base($GSFontGetUseLegacyFontMetrics() ? 71 : 70);
+
     [(NSString *)date drawAtPoint:CGPointMake(
-        (width + 1 - datesize.width) / 2, (71 - datesize.height) / 2
+        (width + 1 - datesize.width) / 2, (base - datesize.height) / 2
     ) withStyle:datestyle];
 
     [(NSString *)day drawAtPoint:CGPointMake(
@@ -1241,6 +1247,8 @@ extern "C" void WBInitialize() {
     NSString *identifier([[NSBundle mainBundle] bundleIdentifier]);
 
     NSLog(@"WB:Notice: WinterBoard");
+
+    _GSFontGetUseLegacyFontMetrics = reinterpret_cast<BOOL (*)()>(dlsym(RTLD_DEFAULT, "GSFontGetUseLegacyFontMetrics"));
 
     struct nlist nl[8];
     memset(nl, 0, sizeof(nl));
