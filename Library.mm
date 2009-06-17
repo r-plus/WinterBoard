@@ -133,13 +133,13 @@ Class $SBUIController;
 Class $SBWidgetApplicationIcon;
 
 @interface NSDictionary (WinterBoard)
-- (UIColor *) colorForKey:(NSString *)key;
-- (BOOL) boolForKey:(NSString *)key;
+- (UIColor *) wb$colorForKey:(NSString *)key;
+- (BOOL) wb$boolForKey:(NSString *)key;
 @end
 
 @implementation NSDictionary (WinterBoard)
 
-- (UIColor *) colorForKey:(NSString *)key {
+- (UIColor *) wb$colorForKey:(NSString *)key {
     NSString *value = [self objectForKey:key];
     if (value == nil)
         return nil;
@@ -147,7 +147,7 @@ Class $SBWidgetApplicationIcon;
     return nil;
 }
 
-- (BOOL) boolForKey:(NSString *)key {
+- (BOOL) wb$boolForKey:(NSString *)key {
     if (NSString *value = [self objectForKey:key])
         return [value boolValue];
     return false;
@@ -376,7 +376,7 @@ MSHook(UIImage *, SBIconModel$getCachedImagedForIcon$, SBIconModel *self, SEL se
 }
 
 MSHook(UIImage *, SBApplicationIcon$icon, SBApplicationIcon *self, SEL sel) {
-    if (![Info_ boolForKey:@"ComposeStoreIcons"])
+    if (![Info_ wb$boolForKey:@"ComposeStoreIcons"])
         if (NSString *path = $pathForIcon$([self application]))
             return [UIImage imageWithContentsOfFile:path];
     return _SBApplicationIcon$icon(self, sel);
@@ -556,7 +556,7 @@ _trace();
     if (NSNumber *number = [Info_ objectForKey:@"NavigationBarStyle"])
         style = [number intValue];
 
-    if (UIColor *color = [Info_ colorForKey:@"NavigationBarTint"])
+    if (UIColor *color = [Info_ wb$colorForKey:@"NavigationBarTint"])
         tint = color;
 
     return [self wb$initWithFrame:frame withBarStyle:style withTintColor:tint];
@@ -1035,7 +1035,7 @@ MSHook(id, SBIconLabel$initWithSize$label$, SBIconLabel *self, SEL sel, CGSize s
 
 MSHook(void, SBIconLabel$setInDock$, SBIconLabel *self, SEL sel, BOOL docked) {
     id &_label(MSHookIvar<id>(self, "_label"));
-    if (![Info_ boolForKey:@"UndockedIconLabels"])
+    if (![Info_ wb$boolForKey:@"UndockedIconLabels"])
         docked = true;
     if (_label != nil && [_label respondsToSelector:@selector(setInDock:)])
         [_label setInDock:docked];

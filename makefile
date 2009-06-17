@@ -28,7 +28,7 @@ package:
 	cp -a WinterBoard.plist winterboard/Library/MobileSubstrate/DynamicLibraries
 	cp -a *.theme winterboard/Library/Themes
 	find winterboard/Library/Themes -name .svn | while read -r line; do rm -rf "$${line}"; done
-	cp -a conffiles control preinst prerm winterboard/DEBIAN
+	cp -a control preinst prerm winterboard/DEBIAN
 	cp -a Test.sh icon.png WinterBoard.dylib WinterBoard UIImages Info.plist winterboard/Applications/WinterBoard.app
 	dpkg-deb -b winterboard winterboard_$(shell grep ^Version: control | cut -d ' ' -f 2)_iphoneos-arm.deb
 
