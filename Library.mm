@@ -81,6 +81,7 @@ bool _itv;
 #import <SpringBoard/SBIconList.h>
 #import <SpringBoard/SBIconModel.h>
 #import <SpringBoard/SBImageCache.h>
+// XXX: #import <SpringBoard/SBSearchView.h>
 #import <SpringBoard/SBStatusBarContentsView.h>
 #import <SpringBoard/SBStatusBarController.h>
 #import <SpringBoard/SBStatusBarOperatorNameView.h>
@@ -125,6 +126,7 @@ Class $SBIconLabel;
 Class $SBIconList;
 Class $SBIconModel;
 //Class $SBImageCache;
+Class $SBSearchView;
 Class $SBStatusBarContentsView;
 Class $SBStatusBarController;
 Class $SBStatusBarOperatorNameView;
@@ -329,6 +331,13 @@ static NSString *$pathForIcon$(SBApplication *self) {
 
 @end
 
+void DumpHierarchy(UIView *view, unsigned index = 0, unsigned indent = 0) {
+    NSLog(@"%*s|%2d:%s", indent * 3, "", index, class_getName([view class]));
+    index = 0;
+    for (UIView *child in [view subviews])
+        DumpHierarchy(child, index++, indent + 1);
+}
+
 UIImage *$cacheForImage$(UIImage *image) {
     CGColorSpaceRef space(CGColorSpaceCreateDeviceRGB());
     CGRect rect = {CGPointMake(1, 1), [image size]};
@@ -367,12 +376,46 @@ MSHook(void, SBIconModel$cacheImageForIcon$, SBIconModel *self, SEL sel, SBIcon 
     _SBIconModel$cacheImageForIcon$(self, sel, icon);
 }
 
+MSHook(void, SBIconModel$cacheImagesForIcon$, SBIconModel *self, SEL sel, SBIcon *icon) {
+    /* XXX: do I /really/ have to do this? figure out how to cache the small icon! */
+    _SBIconModel$cacheImagesForIcon$(self, sel, icon);
+
+    NSString *key([icon displayIdentifier]);
+
+    if (UIImage *image = [icon icon]) {
+        CGSize size = [image size];
+        if (size.width != 59 || size.height != 60) {
+            UIImage *cache($cacheForImage$(image));
+            [Cache_ setObject:cache forKey:key];
+            return;
+        }
+    }
+}
+
 MSHook(UIImage *, SBIconModel$getCachedImagedForIcon$, SBIconModel *self, SEL sel, SBIcon *icon) {
     NSString *key([icon displayIdentifier]);
     if (UIImage *image = [Cache_ objectForKey:key])
         return image;
     else
         return _SBIconModel$getCachedImagedForIcon$(self, sel, icon);
+}
+
+MSHook(UIImage *, SBIconModel$getCachedImagedForIcon$smallIcon$, SBIconModel *self, SEL sel, SBIcon *icon, BOOL small) {
+    if (small)
+        return _SBIconModel$getCachedImagedForIcon$smallIcon$(self, sel, icon, small);
+    NSString *key([icon displayIdentifier]);
+    if (UIImage *image = [Cache_ objectForKey:key])
+        return image;
+    else
+        return _SBIconModel$getCachedImagedForIcon$smallIcon$(self, sel, icon, small);
+}
+
+MSHook(id, SBSearchView$initWithFrame$, id /* XXX: SBSearchView */ self, SEL sel, struct CGRect frame) {
+    if ((self = _SBSearchView$initWithFrame$(self, sel, frame)) != nil) {
+        [self setBackgroundColor:[UIColor clearColor]];
+        for (UIView *child in [self subviews])
+            [child setBackgroundColor:[UIColor clearColor]];
+    } return self;
 }
 
 MSHook(UIImage *, SBApplicationIcon$icon, SBApplicationIcon *self, SEL sel) {
@@ -618,13 +661,6 @@ static NSURL *WallpaperURL_;
         object = nil; \
     } while (false)
 
-void DumpHierarchy(UIView *view, unsigned index = 0, unsigned indent = 0) {
-    NSLog(@"%*s|%2d:%s", indent * 3, "", index, class_getName([view class]));
-    index = 0;
-    for (UIView *child in [view subviews])
-        DumpHierarchy(child, index++, indent + 1);
-}
-
 MSHook(id, SBUIController$init, SBUIController *self, SEL sel) {
     self = _SBUIController$init(self, sel);
     if (self == nil)
@@ -725,8 +761,10 @@ MSHook(id, SBUIController$init, SBUIController *self, SEL sel) {
 
             [WallpaperPage_ loadRequest:[NSURLRequest requestWithURL:WallpaperURL_]];
 
-            [[view webView] setDrawsBackground:false];
             [view setBackgroundColor:[UIColor clearColor]];
+            if ([view respondsToSelector:@selector(setDrawsBackground:)])
+                [view setDrawsBackground:NO];
+            [[view webView] setDrawsBackground:NO];
 
             [content addSubview:view];
         }
@@ -744,8 +782,10 @@ MSHook(id, SBUIController$init, SBUIController *self, SEL sel) {
             NSURL *url = [NSURL fileURLWithPath:html];
             [view loadRequest:[NSURLRequest requestWithURL:url]];
 
-            [[view webView] setDrawsBackground:false];
             [view setBackgroundColor:[UIColor clearColor]];
+            if ([view respondsToSelector:@selector(setDrawsBackground:)])
+                [view setDrawsBackground:NO];
+            [[view webView] setDrawsBackground:NO];
 
             [content addSubview:view];
         }
@@ -1019,6 +1059,11 @@ MSHook(void, SBIconController$noteNumberOfIconListsChanged, SBIconController *se
             }
 
             UIImage *image([UIImage imageWithContentsOfFile:path]);
+
+            CGRect frame([view frame]);
+            frame.size = [image size];
+            [view setFrame:frame];
+
             [view setImage:image];
             [view wb$updateFrame];
         }
@@ -1393,6 +1438,7 @@ extern "C" void WBInitialize() {
         $SBIconList = objc_getClass("SBIconList");
         $SBIconModel = objc_getClass("SBIconModel");
         //$SBImageCache = objc_getClass("SBImageCache");
+        $SBSearchView = objc_getClass("SBSearchView");
         $SBStatusBarContentsView = objc_getClass("SBStatusBarContentsView");
         $SBStatusBarController = objc_getClass("SBStatusBarController");
         $SBStatusBarOperatorNameView = objc_getClass("SBStatusBarOperatorNameView");
@@ -1420,7 +1466,11 @@ extern "C" void WBInitialize() {
         WBRename(SBIconList, setFrame:, setFrame$);
 
         WBRename(SBIconModel, cacheImageForIcon:, cacheImageForIcon$);
+        WBRename(SBIconModel, cacheImagesForIcon:, cacheImagesForIcon$);
         WBRename(SBIconModel, getCachedImagedForIcon:, getCachedImagedForIcon$);
+        WBRename(SBIconModel, getCachedImagedForIcon:smallIcon:, getCachedImagedForIcon$smallIcon$);
+
+        WBRename(SBSearchView, initWithFrame:, initWithFrame$);
 
         //WBRename(SBImageCache, initWithName:forImageWidth:imageHeight:initialCapacity:, initWithName$forImageWidth$imageHeight$initialCapacity$);
 
