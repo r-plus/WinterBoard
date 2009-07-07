@@ -29,7 +29,7 @@ package:
 	cp -a *.theme winterboard/Library/Themes
 	find winterboard/Library/Themes -name .svn | while read -r line; do rm -rf "$${line}"; done
 	cp -a control preinst prerm winterboard/DEBIAN
-	cp -a Test.sh icon.png WinterBoard.dylib WinterBoard UIImages Info.plist winterboard/Applications/WinterBoard.app
+	cp -a Test.sh Icon-Small.png icon.png WinterBoard.dylib WinterBoard UIImages Info.plist winterboard/Applications/WinterBoard.app
 	dpkg-deb -b winterboard winterboard_$(shell grep ^Version: control | cut -d ' ' -f 2)_iphoneos-arm.deb
 
 .PHONY: all clean package

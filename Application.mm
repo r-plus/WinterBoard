@@ -78,8 +78,25 @@ static BOOL changed_;
 
 - (void) applicationWillTerminate:(UIApplication *)application {
     if (changed_) {
-        if (![settings_ writeToFile:plist_ atomically:YES])
+        NSString *description = nil;
+        NSData *data = [NSPropertyListSerialization dataFromPropertyList:settings_ format:NSPropertyListBinaryFormat_v1_0 errorDescription:&description];
+        if (data == nil) {
+            NSLog(@"WB:Error:dataFromPropertyList:%@", description);
+            return;
+        }
+
+        NSError *error = nil;
+        if (![data writeToFile:plist_ options:NSAtomicWrite error:&error]) {
             NSLog(@"WB:Error:writeToFile");
+            return;
+        }
+
+        unlink("/User/Library/Caches/com.apple.springboard-imagecache-icons");
+        unlink("/User/Library/Caches/com.apple.springboard-imagecache-icons.plist");
+
+        unlink("/User/Library/Caches/com.apple.springboard-imagecache-smallicons");
+        unlink("/User/Library/Caches/com.apple.springboard-imagecache-smallicons.plist");
+
         system("killall SpringBoard");
     }
 }

@@ -82,6 +82,7 @@ bool _itv;
 #import <SpringBoard/SBIconModel.h>
 #import <SpringBoard/SBImageCache.h>
 // XXX: #import <SpringBoard/SBSearchView.h>
+#import <SpringBoard/SBSearchTableViewCell.h>
 #import <SpringBoard/SBStatusBarContentsView.h>
 #import <SpringBoard/SBStatusBarController.h>
 #import <SpringBoard/SBStatusBarOperatorNameView.h>
@@ -127,6 +128,7 @@ Class $SBIconList;
 Class $SBIconModel;
 //Class $SBImageCache;
 Class $SBSearchView;
+Class $SBSearchTableViewCell;
 Class $SBStatusBarContentsView;
 Class $SBStatusBarController;
 Class $SBStatusBarOperatorNameView;
@@ -331,11 +333,16 @@ static NSString *$pathForIcon$(SBApplication *self) {
 
 @end
 
-void DumpHierarchy(UIView *view, unsigned index = 0, unsigned indent = 0) {
-    NSLog(@"%*s|%2d:%s", indent * 3, "", index, class_getName([view class]));
+void WBLogRect(const char *tag, struct CGRect rect) {
+    NSLog(@"%s:{%f,%f+%f,%f}", tag, rect.origin.x, rect.origin.y, rect.size.width, rect.size.height);
+}
+
+void WBLogHierarchy(UIView *view, unsigned index = 0, unsigned indent = 0) {
+    CGRect frame([view frame]);
+    NSLog(@"%*s|%2d:%s : {%f,%f+%f,%f} (%@)", indent * 3, "", index, class_getName([view class]), frame.origin.x, frame.origin.y, frame.size.width, frame.size.height, [view backgroundColor]);
     index = 0;
     for (UIView *child in [view subviews])
-        DumpHierarchy(child, index++, indent + 1);
+        WBLogHierarchy(child, index++, indent + 1);
 }
 
 UIImage *$cacheForImage$(UIImage *image) {
@@ -416,6 +423,20 @@ MSHook(id, SBSearchView$initWithFrame$, id /* XXX: SBSearchView */ self, SEL sel
         for (UIView *child in [self subviews])
             [child setBackgroundColor:[UIColor clearColor]];
     } return self;
+}
+
+MSHook(id, SBSearchTableViewCell$initWithStyle$reuseIdentifier$, SBSearchTableViewCell *self, SEL sel, int style, NSString *reuse) {
+    if ((self = _SBSearchTableViewCell$initWithStyle$reuseIdentifier$(self, sel, style, reuse)) != nil) {
+        [self setBackgroundColor:[UIColor clearColor]];
+    } return self;
+}
+
+MSHook(void, SBSearchTableViewCell$drawRect$, SBSearchTableViewCell *self, SEL sel, struct CGRect rect, BOOL selected) {
+    _SBSearchTableViewCell$drawRect$(self, sel, rect, selected);
+    float inset([self edgeInset]);
+    [[UIColor clearColor] set];
+    UIRectFill(CGRectMake(0, 0, inset, rect.size.height));
+    UIRectFill(CGRectMake(rect.size.width - inset, 0, inset, rect.size.height));
 }
 
 MSHook(UIImage *, SBApplicationIcon$icon, SBApplicationIcon *self, SEL sel) {
@@ -746,6 +767,8 @@ MSHook(id, SBUIController$init, SBUIController *self, SEL sel) {
         if (image != nil) {
             WallpaperFile_ = [path retain];
             WallpaperImage_ = [[UIImageView alloc] initWithImage:image];
+            if (NSNumber *number = [Info_ objectForKey:@"WallpaperAlpha"])
+                [WallpaperImage_ setAlpha:[number floatValue]];
             [content addSubview:WallpaperImage_];
         }
 
@@ -792,7 +815,7 @@ MSHook(id, SBUIController$init, SBUIController *self, SEL sel) {
     }
 
     [content addSubview:layer];
-    DumpHierarchy(_window);
+    WBLogHierarchy(_window);
 
     return self;
 }
@@ -1188,7 +1211,7 @@ MSHook(void, mSMSMessageTranscriptController$loadView, mSMSMessageTranscriptCont
 MSHook(UIImage *, _UIImageWithName, NSString *name) {
     int id(_UISharedImageNameGetIdentifier(name));
     if (Debug_)
-        NSLog(@"WB:Debug: _UIImageWithName(\"%@\", %d)", name, id);
+        NSLog(@"WB:Debug: _UIImageWithName(\"%@\": %d)", name, id);
 
     if (id == -1)
         return _UIImageAtPath(name, _UIKitBundle());
@@ -1228,6 +1251,8 @@ MSHook(UIImage *, _UIImageWithNameInDomain, NSString *name, NSString *domain) {
 }
 
 MSHook(GSFontRef, GSFontCreateWithName, const char *name, GSFontSymbolicTraits traits, float size) {
+    if (Debug_)
+        NSLog(@"WB:Debug: GSFontCreateWithName(\"%s\", %f)", name, size);
     if (NSString *font = [Info_ objectForKey:[NSString stringWithFormat:@"FontName-%s", name]])
         name = [font UTF8String];
     return _GSFontCreateWithName(name, traits, size);
@@ -1239,6 +1264,8 @@ MSHook(GSFontRef, GSFontCreateWithName, const char *name, GSFontSymbolicTraits t
 bool (*_Z24GetFileNameForThisActionmPcRb)(unsigned long a0, char *a1, bool &a2);
 
 MSHook(bool, _Z24GetFileNameForThisActionmPcRb, unsigned long a0, char *a1, bool &a2) {
+    if (Debug_)
+        NSLog(@"WB:Debug:GetFileNameForThisAction(%u, %p, %u)", a0, a1, a2);
     bool value = __Z24GetFileNameForThisActionmPcRb(a0, a1, a2);
     if (Debug_)
         NSLog(@"WB:Debug:GetFileNameForThisAction(%u, %s, %u) = %u", a0, value ? a1 : NULL, a2, value);
@@ -1286,6 +1313,20 @@ static void ChangeWallpaper(
 #define WBRename(name, sel, imp) \
     _ ## name ## $ ## imp = MSHookMessage($ ## name, @selector(sel), &$ ## name ## $ ## imp)
 
+template <typename Type_>
+static void nlset(Type_ &function, struct nlist *nl, size_t index) {
+    struct nlist &name(nl[index]);
+    uintptr_t value(name.n_value);
+    if ((name.n_desc & N_ARM_THUMB_DEF) != 0)
+        value |= 0x00000001;
+    function = reinterpret_cast<Type_>(value);
+}
+
+template <typename Type_>
+static void dlset(Type_ &function, const char *name) {
+    _GSFontGetUseLegacyFontMetrics = reinterpret_cast<Type_>(dlsym(RTLD_DEFAULT, name));
+}
+
 extern "C" void WBInitialize() {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
 
@@ -1293,11 +1334,11 @@ extern "C" void WBInitialize() {
 
     NSLog(@"WB:Notice: WinterBoard");
 
-    _GSFontGetUseLegacyFontMetrics = reinterpret_cast<BOOL (*)()>(dlsym(RTLD_DEFAULT, "GSFontGetUseLegacyFontMetrics"));
+    dlset(_GSFontGetUseLegacyFontMetrics, "GSFontGetUseLegacyFontMetrics");
 
     struct nlist nl[8];
-    memset(nl, 0, sizeof(nl));
 
+    memset(nl, 0, sizeof(nl));
     nl[0].n_un.n_name = (char *) "__UIApplicationImageWithName";
     nl[1].n_un.n_name = (char *) "__UIImageAtPath";
     nl[2].n_un.n_name = (char *) "__UIImageRefAtPath";
@@ -1305,16 +1346,15 @@ extern "C" void WBInitialize() {
     nl[4].n_un.n_name = (char *) "__UIKitBundle";
     nl[5].n_un.n_name = (char *) "__UISharedImageNameGetIdentifier";
     nl[6].n_un.n_name = (char *) "__UISharedImageWithIdentifier";
-
     nlist(UIKit, nl);
 
-    _UIApplicationImageWithName = (UIImage *(*)(NSString *)) nl[0].n_value;
-    _UIImageAtPath = (UIImage *(*)(NSString *, NSBundle *)) nl[1].n_value;
-    _UIImageRefAtPath = (CGImageRef (*)(NSString *, bool, UIImageOrientation *)) nl[2].n_value;
-    _UIImageWithNameInDomain = (UIImage *(*)(NSString *, NSString *)) nl[3].n_value;
-    _UIKitBundle = (NSBundle *(*)()) nl[4].n_value;
-    _UISharedImageNameGetIdentifier = (int (*)(NSString *)) nl[5].n_value;
-    _UISharedImageWithIdentifier = (UIImage *(*)(int)) nl[6].n_value;
+    nlset(_UIApplicationImageWithName, nl, 0);
+    nlset(_UIImageAtPath, nl, 1);
+    nlset(_UIImageRefAtPath, nl, 2);
+    nlset(_UIImageWithNameInDomain, nl, 3);
+    nlset(_UIKitBundle, nl, 4);
+    nlset(_UISharedImageNameGetIdentifier, nl, 5);
+    nlset(_UISharedImageWithIdentifier, nl, 6);
 
     MSHookFunction(_UIApplicationImageWithName, &$_UIApplicationImageWithName, &__UIApplicationImageWithName);
     MSHookFunction(_UIImageRefAtPath, &$_UIImageRefAtPath, &__UIImageRefAtPath);
@@ -1328,7 +1368,7 @@ extern "C" void WBInitialize() {
         memset(nl, 0, sizeof(nl));
         nl[0].n_un.n_name = (char *) "__Z24GetFileNameForThisActionmPcRb";
         nlist(AudioToolbox, nl);
-        _Z24GetFileNameForThisActionmPcRb = (bool (*)(unsigned long, char *, bool &)) nl[0].n_value;
+        nlset(_Z24GetFileNameForThisActionmPcRb, nl, 0);
         MSHookFunction(_Z24GetFileNameForThisActionmPcRb, &$_Z24GetFileNameForThisActionmPcRb, &__Z24GetFileNameForThisActionmPcRb);
     }
 
@@ -1439,6 +1479,7 @@ extern "C" void WBInitialize() {
         $SBIconModel = objc_getClass("SBIconModel");
         //$SBImageCache = objc_getClass("SBImageCache");
         $SBSearchView = objc_getClass("SBSearchView");
+        $SBSearchTableViewCell = objc_getClass("SBSearchTableViewCell");
         $SBStatusBarContentsView = objc_getClass("SBStatusBarContentsView");
         $SBStatusBarController = objc_getClass("SBStatusBarController");
         $SBStatusBarOperatorNameView = objc_getClass("SBStatusBarOperatorNameView");
@@ -1471,6 +1512,8 @@ extern "C" void WBInitialize() {
         WBRename(SBIconModel, getCachedImagedForIcon:smallIcon:, getCachedImagedForIcon$smallIcon$);
 
         WBRename(SBSearchView, initWithFrame:, initWithFrame$);
+        WBRename(SBSearchTableViewCell, drawRect:, drawRect$);
+        WBRename(SBSearchTableViewCell, initWithStyle:reuseIdentifier:, initWithStyle$reuseIdentifier$);
 
         //WBRename(SBImageCache, initWithName:forImageWidth:imageHeight:initialCapacity:, initWithName$forImageWidth$imageHeight$initialCapacity$);
 
