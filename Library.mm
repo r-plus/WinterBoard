@@ -114,6 +114,8 @@ Class $UIImage;
 Class $UINavigationBar;
 Class $UIToolbar;
 
+Class $CKTranscriptController;
+
 Class $SBApplication;
 Class $SBApplicationIcon;
 Class $SBAwayView;
@@ -976,15 +978,15 @@ void SBStatusBarController$setStatusBarMode(int &mode) {
 }*/
 
 MSHook(void, SBStatusBarController$setStatusBarMode$orientation$duration$fenceID$animation$, SBStatusBarController *self, SEL sel, int mode, int orientation, float duration, int fenceID, int animation) {
-    NSLog(@"mode:%d orientation:%d duration:%f fenceID:%d animation:%d", mode, orientation, duration, fenceID, animation);
+    //NSLog(@"mode:%d orientation:%d duration:%f fenceID:%d animation:%d", mode, orientation, duration, fenceID, animation);
     SBStatusBarController$setStatusBarMode(mode);
     return _SBStatusBarController$setStatusBarMode$orientation$duration$fenceID$animation$(self, sel, mode, orientation, duration, fenceID, animation);
 }
 
 MSHook(void, SBStatusBarController$setStatusBarMode$orientation$duration$fenceID$animation$startTime$, SBStatusBarController *self, SEL sel, int mode, int orientation, double duration, int fenceID, int animation, double startTime) {
-    NSLog(@"mode:%d orientation:%d duration:%f fenceID:%d animation:%d startTime:%f", mode, orientation, duration, fenceID, animation, startTime);
+    //NSLog(@"mode:%d orientation:%d duration:%f fenceID:%d animation:%d startTime:%f", mode, orientation, duration, fenceID, animation, startTime);
     SBStatusBarController$setStatusBarMode(mode);
-    NSLog(@"mode=%u", mode);
+    //NSLog(@"mode=%u", mode);
     return _SBStatusBarController$setStatusBarMode$orientation$duration$fenceID$animation$startTime$(self, sel, mode, orientation, duration, fenceID, animation, startTime);
 }
 
@@ -1194,17 +1196,34 @@ MSHook(void, SBIconLabel$drawRect$, SBIconLabel *self, SEL sel, CGRect rect) {
     [label drawAtPoint:CGPointMake((bounds.size.width - size.width) / 2, 0) withStyle:style];
 }
 
-MSHook(void, mSMSMessageTranscriptController$loadView, mSMSMessageTranscriptController *self, SEL sel) {
-    _mSMSMessageTranscriptController$loadView(self, sel);
+MSHook(void, TranscriptController$loadView, mSMSMessageTranscriptController *self, SEL sel) {
+    _TranscriptController$loadView(self, sel);
 
     if (NSString *path = $getTheme$([NSArray arrayWithObjects:@"SMSBackground.png", @"SMSBackground.jpg", nil]))
         if (UIImage *image = [[UIImage alloc] initWithContentsOfFile:path]) {
             [image autorelease];
+
+            UIView *&_transcriptTable(MSHookIvar<UIView *>(self, "_transcriptTable"));
             UIView *&_transcriptLayer(MSHookIvar<UIView *>(self, "_transcriptLayer"));
-            UIView *parent([_transcriptLayer superview]);
+            UIView *table;
+            if (&_transcriptTable != NULL)
+                table = _transcriptTable;
+            else if (&_transcriptLayer != NULL)
+                table = _transcriptLayer;
+            else
+                table = nil;
+
+            UIView *placard(table != nil ? [table superview] : MSHookIvar<UIView *>(self, "_backPlacard"));
             UIImageView *background([[[UIImageView alloc] initWithImage:image] autorelease]);
-            [parent insertSubview:background belowSubview:_transcriptLayer];
-            [_transcriptLayer setBackgroundColor:[UIColor clearColor]];
+
+            if (table == nil)
+                [placard insertSubview:background atIndex:0];
+            else {
+                [table setBackgroundColor:[UIColor clearColor]];
+                [placard insertSubview:background belowSubview:table];
+            }
+
+            WBLogHierarchy(placard);
         }
 }
 
@@ -1324,7 +1343,7 @@ static void nlset(Type_ &function, struct nlist *nl, size_t index) {
 
 template <typename Type_>
 static void dlset(Type_ &function, const char *name) {
-    _GSFontGetUseLegacyFontMetrics = reinterpret_cast<Type_>(dlsym(RTLD_DEFAULT, name));
+    function = reinterpret_cast<Type_>(dlsym(RTLD_DEFAULT, name));
 }
 
 extern "C" void WBInitialize() {
@@ -1448,9 +1467,14 @@ extern "C" void WBInitialize() {
                     [Info_ setObject:[info objectForKey:key] forKey:key];
         }
 
+    $CKTranscriptController = objc_getClass("CKTranscriptController");
+    _TranscriptController$loadView = MSHookMessage($CKTranscriptController, @selector(loadView), &$TranscriptController$loadView);
+
     if ([identifier isEqualToString:@"com.apple.MobileSMS"]) {
-        Class mSMSMessageTranscriptController = objc_getClass("mSMSMessageTranscriptController");
-        _mSMSMessageTranscriptController$loadView = MSHookMessage(mSMSMessageTranscriptController, @selector(loadView), &$mSMSMessageTranscriptController$loadView);
+        if (_TranscriptController$loadView == NULL) {
+            Class mSMSMessageTranscriptController = objc_getClass("mSMSMessageTranscriptController");
+            _TranscriptController$loadView = MSHookMessage(mSMSMessageTranscriptController, @selector(loadView), &$TranscriptController$loadView);
+        }
     } else if ([identifier isEqualToString:@"com.apple.springboard"]) {
         CFNotificationCenterAddObserver(
             CFNotificationCenterGetDarwinNotifyCenter(),
