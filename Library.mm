@@ -98,6 +98,8 @@ bool _itv;
 
 #import <CoreGraphics/CGGeometry.h>
 
+#import <ChatKit/CKMessageCell.h>
+
 extern "C" void __clear_cache (char *beg, char *end);
 
 @protocol WinterBoard
@@ -114,7 +116,10 @@ Class $UIImage;
 Class $UINavigationBar;
 Class $UIToolbar;
 
+Class $CKMessageCell;
+Class $CKTimestampView;
 Class $CKTranscriptController;
+Class $CKTranscriptTableView;
 
 Class $SBApplication;
 Class $SBApplicationIcon;
@@ -230,6 +235,8 @@ static NSString *$pathForFile$inBundle$(NSString *file, NSBundle *bundle, bool u
             [names addObject:[NSString stringWithFormat:@"%@.png", newname]]; \
 
     if (identifier == nil);
+    else if ([identifier isEqualToString:@"com.apple.chatkit"])
+        [names addObject:[NSString stringWithFormat:@"Bundles/com.apple.MobileSMS/%@", file]];
     else if ([identifier isEqualToString:@"com.apple.calculator"])
         [names addObject:[NSString stringWithFormat:@"Files/Applications/Calculator.app/%@", file]];
     else if (![identifier isEqualToString:@"com.apple.springboard"]);
@@ -341,7 +348,7 @@ void WBLogRect(const char *tag, struct CGRect rect) {
 
 void WBLogHierarchy(UIView *view, unsigned index = 0, unsigned indent = 0) {
     CGRect frame([view frame]);
-    NSLog(@"%*s|%2d:%s : {%f,%f+%f,%f} (%@)", indent * 3, "", index, class_getName([view class]), frame.origin.x, frame.origin.y, frame.size.width, frame.size.height, [view backgroundColor]);
+    NSLog(@"%*s|%2d:%p:%s : {%f,%f+%f,%f} (%@)", indent * 3, "", index, view, class_getName([view class]), frame.origin.x, frame.origin.y, frame.size.width, frame.size.height, [view backgroundColor]);
     index = 0;
     for (UIView *child in [view subviews])
         WBLogHierarchy(child, index++, indent + 1);
@@ -1021,12 +1028,17 @@ MSHook(void, SBStatusBarTimeView$drawRect$, SBStatusBarTimeView *self, SEL sel, 
 
 @interface UIView (WinterBoard)
 - (bool) wb$isWBImageView;
+- (void) wb$logHierarchy;
 @end
 
 @implementation UIView (WinterBoard)
 
 - (bool) wb$isWBImageView {
     return false;
+}
+
+- (void) wb$logHierarchy {
+    WBLogHierarchy(self);
 }
 
 @end
@@ -1196,6 +1208,35 @@ MSHook(void, SBIconLabel$drawRect$, SBIconLabel *self, SEL sel, CGRect rect) {
     [label drawAtPoint:CGPointMake((bounds.size.width - size.width) / 2, 0) withStyle:style];
 }
 
+MSHook(void, CKMessageCell$addBalloonView$, id self, SEL sel, CKBalloonView *balloon) {
+    _CKMessageCell$addBalloonView$(self, sel, balloon);
+    [balloon setBackgroundColor:[UIColor clearColor]];
+}
+
+MSHook(id, CKMessageCell$initWithStyle$reuseIdentifier$, id self, SEL sel, int style, NSString *reuse) {
+    if ((self = _CKMessageCell$initWithStyle$reuseIdentifier$(self, sel, style, reuse)) != nil) {
+        [[self contentView] setBackgroundColor:[UIColor clearColor]];
+    } return self;
+}
+
+MSHook(id, CKTimestampView$initWithStyle$reuseIdentifier$, id self, SEL sel, int style, NSString *reuse) {
+    if ((self = _CKTimestampView$initWithStyle$reuseIdentifier$(self, sel, style, reuse)) != nil) {
+        UILabel *&_label(MSHookIvar<UILabel *>(self, "_label"));
+        [_label setBackgroundColor:[UIColor clearColor]];
+    } return self;
+}
+
+MSHook(void, CKTranscriptTableView$setSeparatorStyle$, id self, SEL sel, int style) {
+    _CKTranscriptTableView$setSeparatorStyle$(self, sel, UITableViewCellSeparatorStyleNone);
+}
+
+MSHook(id, CKTranscriptTableView$initWithFrame$style$, id self, SEL sel, CGRect frame, int style) {
+    _trace();
+    if ((self = _CKTranscriptTableView$initWithFrame$style$(self, sel, frame, style)) != nil) {
+        [self setSeparatorStyle:UITableViewCellSeparatorStyleNone];
+    } return self;
+}
+
 MSHook(void, TranscriptController$loadView, mSMSMessageTranscriptController *self, SEL sel) {
     _TranscriptController$loadView(self, sel);
 
@@ -1224,6 +1265,8 @@ MSHook(void, TranscriptController$loadView, mSMSMessageTranscriptController *sel
             }
 
             WBLogHierarchy(placard);
+
+            [placard performSelector:@selector(wb$logHierarchy) withObject:nil afterDelay:10];
         }
 }
 
@@ -1467,13 +1510,31 @@ extern "C" void WBInitialize() {
                     [Info_ setObject:[info objectForKey:key] forKey:key];
         }
 
-    $CKTranscriptController = objc_getClass("CKTranscriptController");
-    _TranscriptController$loadView = MSHookMessage($CKTranscriptController, @selector(loadView), &$TranscriptController$loadView);
+    bool sms($getTheme$([NSArray arrayWithObjects:@"SMSBackground.png", @"SMSBackground.jpg", nil]) != nil);
+
+    if ([NSBundle bundleWithIdentifier:@"com.apple.chatkit"])
+        if (sms) {
+            $CKMessageCell = objc_getClass("CKMessageCell");
+            _CKMessageCell$addBalloonView$ = MSHookMessage($CKMessageCell, @selector(addBalloonView:), &$CKMessageCell$addBalloonView$);
+            _CKMessageCell$initWithStyle$reuseIdentifier$ = MSHookMessage($CKMessageCell, @selector(initWithStyle:reuseIdentifier:), &$CKMessageCell$initWithStyle$reuseIdentifier$);
+
+            $CKTranscriptTableView = objc_getClass("CKTranscriptTableView");
+            _CKTranscriptTableView$setSeparatorStyle$ = MSHookMessage($CKTranscriptTableView, @selector(setSeparatorStyle:), &$CKTranscriptTableView$setSeparatorStyle$);
+            _CKTranscriptTableView$initWithFrame$style$ = MSHookMessage($CKTranscriptTableView, @selector(initWithFrame:style:), &$CKTranscriptTableView$initWithFrame$style$);
+
+            $CKTimestampView = objc_getClass("CKTimestampView");
+            _CKTimestampView$initWithStyle$reuseIdentifier$ = MSHookMessage($CKTimestampView, @selector(initWithStyle:reuseIdentifier:), &$CKTimestampView$initWithStyle$reuseIdentifier$);
+
+            $CKTranscriptController = objc_getClass("CKTranscriptController");
+            _TranscriptController$loadView = MSHookMessage($CKTranscriptController, @selector(loadView), &$TranscriptController$loadView);
+        }
 
     if ([identifier isEqualToString:@"com.apple.MobileSMS"]) {
-        if (_TranscriptController$loadView == NULL) {
-            Class mSMSMessageTranscriptController = objc_getClass("mSMSMessageTranscriptController");
-            _TranscriptController$loadView = MSHookMessage(mSMSMessageTranscriptController, @selector(loadView), &$TranscriptController$loadView);
+        if (sms) {
+            if (_TranscriptController$loadView == NULL) {
+                Class mSMSMessageTranscriptController = objc_getClass("mSMSMessageTranscriptController");
+                _TranscriptController$loadView = MSHookMessage(mSMSMessageTranscriptController, @selector(loadView), &$TranscriptController$loadView);
+            }
         }
     } else if ([identifier isEqualToString:@"com.apple.springboard"]) {
         CFNotificationCenterAddObserver(
