@@ -824,7 +824,6 @@ MSHook(id, SBUIController$init, SBUIController *self, SEL sel) {
     }
 
     [content addSubview:layer];
-    WBLogHierarchy(_window);
 
     return self;
 }
@@ -1263,10 +1262,6 @@ MSHook(void, TranscriptController$loadView, mSMSMessageTranscriptController *sel
                 [table setBackgroundColor:[UIColor clearColor]];
                 [placard insertSubview:background belowSubview:table];
             }
-
-            WBLogHierarchy(placard);
-
-            [placard performSelector:@selector(wb$logHierarchy) withObject:nil afterDelay:10];
         }
 }
 
