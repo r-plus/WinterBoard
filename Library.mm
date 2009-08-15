@@ -1276,24 +1276,22 @@ MSHook(UIImage *, _UIImageWithName, NSString *name) {
         NSNumber *key([NSNumber numberWithInt:id]);
         UIImage *image = [UIImages_ objectForKey:key];
         if (image != nil)
-            return reinterpret_cast<id>(image) == [NSNull null] ? nil : image;
+            return reinterpret_cast<id>(image) == [NSNull null] ? _UISharedImageWithIdentifier(id) : image;
         if (NSString *path = $pathForFile$inBundle$(name, _UIKitBundle(), true)) {
             image = [[UIImage alloc] initWithContentsOfFile:path cache:true];
             if (image != nil)
                 [image autorelease];
         }
-        if (image == nil)
-            image = _UISharedImageWithIdentifier(id);
         [UIImages_ setObject:(image == nil ? [NSNull null] : reinterpret_cast<id>(image)) forKey:key];
-        return image;
+        return image == nil ? _UISharedImageWithIdentifier(id) : image;
     }
 }
 
 MSHook(UIImage *, _UIImageWithNameInDomain, NSString *name, NSString *domain) {
-    NSString *key = [NSString stringWithFormat:@"D:%zu%@%@", [domain length], domain, name];
-    UIImage *image = [PathImages_ objectForKey:key];
+    NSString *key([NSString stringWithFormat:@"D:%zu%@%@", [domain length], domain, name]);
+    UIImage *image([PathImages_ objectForKey:key]);
     if (image != nil)
-        return reinterpret_cast<id>(image) == [NSNull null] ? nil : image;
+        return reinterpret_cast<id>(image) == [NSNull null] ? __UIImageWithNameInDomain(name, domain) : image;
     if (Debug_)
         NSLog(@"WB:Debug: UIImageWithNameInDomain(\"%@\", \"%@\")", name, domain);
     if (NSString *path = $getTheme$([NSArray arrayWithObject:[NSString stringWithFormat:@"Domains/%@/%@", domain, name]])) {
@@ -1301,10 +1299,8 @@ MSHook(UIImage *, _UIImageWithNameInDomain, NSString *name, NSString *domain) {
         if (image != nil)
             [image autorelease];
     }
-    if (image == nil)
-        image = __UIImageWithNameInDomain(name, domain);
     [PathImages_ setObject:(image == nil ? [NSNull null] : reinterpret_cast<id>(image)) forKey:key];
-    return image;
+    return image == nil ? __UIImageWithNameInDomain(name, domain) : image;
 }
 
 MSHook(GSFontRef, GSFontCreateWithName, const char *name, GSFontSymbolicTraits traits, float size) {
