@@ -1,5 +1,5 @@
 /* WinterBoard - Theme Manager for the iPhone
- * Copyright (C) 2008  Jay Freeman (saurik)
+ * Copyright (C) 2008-2009  Jay Freeman (saurik)
 */
 
 /*
@@ -39,30 +39,59 @@
 #import <CoreGraphics/CGGeometry.h>
 #import <UIKit/UIKit.h>
 
-#define _trace() NSLog(@"WE:_trace(%u)", __LINE__);
+#import <Preferences/PSRootController.h>
+#import <Preferences/PSViewController.h>
+#import <Preferences/PSSpecifier.h>
 
-static NSString *plist_;
-static NSMutableDictionary *settings_;
-static BOOL changed_;
+@interface UIApplication (Private)
+- (void) terminateWithSuccess;
+@end
 
-@interface WBThemeTableViewCell : UITableViewCell {
-    UILabel *label;
+@interface WBRootController : PSRootController {
+    PSViewController *_firstViewController;
 }
 
+@property (readonly) PSViewController *firstViewController;
+
+- (void) setupRootListForSize:(CGSize)size;
+- (BOOL) popController;
+
 @end
 
-@implementation WBThemeTableViewCell
+@implementation WBRootController
 
+@synthesize firstViewController = _firstViewController;
 
+- (void) setupRootListForSize:(CGSize)size {
+    PSSpecifier *spec = [[PSSpecifier alloc] init];
+    [spec setTarget:self];
+    spec.name = @"WinterBoard";
+
+    NSBundle *wbSettingsBundle = [NSBundle bundleWithPath:@"/System/Library/PreferenceBundles/WinterBoardSettings.bundle"];
+    [wbSettingsBundle load];
+
+    _firstViewController = [[[wbSettingsBundle principalClass] alloc] initForContentSize:size];
+    _firstViewController.rootController = self;
+    _firstViewController.parentController = self;
+    [_firstViewController viewWillBecomeVisible:spec];
+
+    [spec release];
+
+    [self pushController:_firstViewController];
+}
+
+- (BOOL) popController {
+    // Pop the last controller = exit the application.
+    // The only time the last controller should pop is when the user taps Respring/Cancel.
+    // Which only gets displayed if the user has made changes.
+    if([self lastController] == _firstViewController)
+        [[UIApplication sharedApplication] terminateWithSuccess];
+    return [super popController];
+}
 @end
 
-@interface WBApplication : UIApplication <
-    UITableViewDataSource,
-    UITableViewDelegate
-> {
-    UIWindow *window_;
-    UITableView *themesTable_;
-    NSMutableArray *themesArray_;
+@interface WBApplication : UIApplication {
+    WBRootController *_rootController;
 }
 
 @end
@@ -70,158 +99,19 @@ static BOOL changed_;
 @implementation WBApplication
 
 - (void) dealloc {
-    [window_ release];
-    [themesTable_ release];
-    [themesArray_ release];
+    [_rootController release];
     [super dealloc];
 }
 
 - (void) applicationWillTerminate:(UIApplication *)application {
-    if (changed_) {
-        NSString *description = nil;
-        NSData *data = [NSPropertyListSerialization dataFromPropertyList:settings_ format:NSPropertyListBinaryFormat_v1_0 errorDescription:&description];
-        if (data == nil) {
-            NSLog(@"WB:Error:dataFromPropertyList:%@", description);
-            return;
-        }
-
-        NSError *error = nil;
-        if (![data writeToFile:plist_ options:NSAtomicWrite error:&error]) {
-            NSLog(@"WB:Error:writeToFile");
-            return;
-        }
-
-        unlink("/User/Library/Caches/com.apple.springboard-imagecache-icons");
-        unlink("/User/Library/Caches/com.apple.springboard-imagecache-icons.plist");
-
-        unlink("/User/Library/Caches/com.apple.springboard-imagecache-smallicons");
-        unlink("/User/Library/Caches/com.apple.springboard-imagecache-smallicons.plist");
-
-        system("killall SpringBoard");
-    }
-}
-
-- (UITableViewCell *) tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
-    UITableViewCell *cell = [[[UITableViewCell alloc] initWithFrame:CGRectZero] autorelease];
-    NSMutableDictionary *theme = [themesArray_ objectAtIndex:[indexPath row]];
-    cell.text = [theme objectForKey:@"Name"];
-    cell.hidesAccessoryWhenEditing = NO;
-    NSNumber *active = [theme objectForKey:@"Active"];
-    BOOL inactive = active == nil || ![active boolValue];
-    cell.accessoryType = inactive ? UITableViewCellAccessoryNone : UITableViewCellAccessoryCheckmark;
-    return cell;
-}
-
-- (void) tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
-    UITableViewCell *cell = [tableView cellForRowAtIndexPath:indexPath];
-    NSMutableDictionary *theme = [themesArray_ objectAtIndex:[indexPath row]];
-    NSNumber *active = [theme objectForKey:@"Active"];
-    BOOL inactive = active == nil || ![active boolValue];
-    [theme setObject:[NSNumber numberWithBool:inactive] forKey:@"Active"];
-    cell.accessoryType = inactive ? UITableViewCellAccessoryCheckmark : UITableViewCellAccessoryNone;
-    [themesTable_ deselectRowAtIndexPath:(NSIndexPath *)indexPath animated:YES];
-    changed_ = YES;
-}
-
-- (NSInteger) tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section {
-    return [themesArray_ count];
-}
-
-- (UITableViewCellEditingStyle) tableView:(UITableView *)tableView editingStyleForRowAtIndexPath:(NSIndexPath *)indexPath {
-    return UITableViewCellEditingStyleNone;
-}
-
-- (void) tableView:(UITableView *)tableView moveRowAtIndexPath:(NSIndexPath *)fromIndexPath toIndexPath:(NSIndexPath *)toIndexPath {
-    NSUInteger fromIndex = [fromIndexPath row];
-    NSUInteger toIndex = [toIndexPath row];
-    if (fromIndex == toIndex)
-        return;
-    NSMutableDictionary *theme = [[[themesArray_ objectAtIndex:fromIndex] retain] autorelease];
-    [themesArray_ removeObjectAtIndex:fromIndex];
-    [themesArray_ insertObject:theme atIndex:toIndex];
-    changed_ = YES;
-}
-
-- (BOOL) tableView:(UITableView *)tableView canMoveRowAtIndexPath:(NSIndexPath *)indexPath {
-    return YES;
+    [_rootController.firstViewController suspend];
 }
 
 - (void) applicationDidFinishLaunching:(id)unused {
-    window_ = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].applicationFrame];
-    [window_ makeKeyAndVisible];
-
-    plist_ = [[NSString stringWithFormat:@"%@/Library/Preferences/com.saurik.WinterBoard.plist",
-        NSHomeDirectory()
-    ] retain];
-
-    settings_ = [[NSMutableDictionary alloc] initWithContentsOfFile:plist_];
-    if (settings_ == nil)
-        settings_ = [[NSMutableDictionary alloc] initWithCapacity:16];
-
-    themesArray_ = [settings_ objectForKey:@"Themes"];
-    if (themesArray_ == nil) {
-        if (NSString *theme = [settings_ objectForKey:@"Theme"]) {
-            themesArray_ = [[NSArray arrayWithObject:[[NSDictionary dictionaryWithObjectsAndKeys:
-                theme, @"Name",
-                [NSNumber numberWithBool:YES], @"Active",
-            nil] mutableCopy]] mutableCopy];
-
-            [settings_ removeObjectForKey:@"Theme"];
-        }
-
-        if (themesArray_ == nil)
-            themesArray_ = [NSMutableArray arrayWithCapacity:16];
-        [settings_ setObject:themesArray_ forKey:@"Themes"];
-    }
-
-    themesArray_ = [themesArray_ retain];
-
-    NSMutableSet *themesSet = [NSMutableSet setWithCapacity:32];
-    for (NSMutableDictionary *theme in themesArray_)
-        if (NSString *name = [theme objectForKey:@"Name"])
-            [themesSet addObject:name];
-
-    NSFileManager *manager = [NSFileManager defaultManager];
-
-    NSMutableArray *themes = [NSMutableArray arrayWithCapacity:32];
-    [themes addObjectsFromArray:[manager contentsOfDirectoryAtPath:@"/Library/Themes" error:NULL]];
-    [themes addObjectsFromArray:[manager contentsOfDirectoryAtPath:[NSString stringWithFormat:@"%@/Library/SummerBoard/Themes", NSHomeDirectory()] error:NULL]];
-
-    for (NSUInteger i(0), e([themes count]); i != e; ++i) {
-        NSString *theme = [themes objectAtIndex:i];
-        if ([theme hasSuffix:@".theme"])
-            [themes replaceObjectAtIndex:i withObject:[theme substringWithRange:NSMakeRange(0, [theme length] - 6)]];
-    }
-
-    for (NSUInteger i(0), e([themesArray_ count]); i != e; ++i) {
-        NSMutableDictionary *theme = [themesArray_ objectAtIndex:i];
-        NSString *name = [theme objectForKey:@"Name"];
-        if (name == nil || ![themes containsObject:name]) {
-            [themesArray_ removeObjectAtIndex:i];
-            --i; --e;
-        }
-    }
-
-    for (NSString *theme in themes) {
-        if ([themesSet containsObject:theme])
-            continue;
-        [themesSet addObject:theme];
-        [themesArray_ insertObject:[[NSDictionary dictionaryWithObjectsAndKeys:
-            theme, @"Name",
-            [NSNumber numberWithBool:NO], @"Active",
-        nil] mutableCopy] atIndex:0];
-    }
-
-    themesTable_ = [[UITableView alloc] initWithFrame:window_.bounds];
-    [window_ addSubview:themesTable_];
-
-    [themesTable_ setDataSource:self];
-    [themesTable_ setDelegate:self];
-
-    [themesTable_ setEditing:YES animated:NO];
-    themesTable_.allowsSelectionDuringEditing = YES;
-
-    [themesTable_ setSeparatorStyle:UITableViewCellSeparatorStyleSingleLine];
+    UIWindow *window = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].applicationFrame];
+    _rootController = [[WBRootController alloc] initWithTitle:@"WinterBoard" identifier:[[NSBundle mainBundle] bundleIdentifier]];
+    [window addSubview:_rootController.contentView];
+    [window makeKeyAndVisible];
 }
 
 @end

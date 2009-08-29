@@ -1,5 +1,5 @@
 /* WinterBoard - Theme Manager for the iPhone
- * Copyright (C) 2008  Jay Freeman (saurik)
+ * Copyright (C) 2008-2009  Jay Freeman (saurik)
 */
 
 /*

@@ -1,0 +1,37 @@
+{
+    items = (
+	{
+	    cell = PSSwitchCell;
+	    key = ArbitrarySetting;
+	    label = "Arbitrary Switch 1";
+	},
+	{
+	    cell = PSSwitchCell;
+	    key = ArbitrarySettingTwo;
+	    label = "Arbitrary Switch 2";
+	    negate = 1;
+	},
+	{
+	    cell = PSSwitchCell;
+	    default = 1;
+	    key = ArbitrarySettingThree;
+	    label = "Arbitrary Switch 3";
+	},
+	{
+	    cell = PSSwitchCell;
+	    default = 0;
+	    key = ArbitrarySettingFour;
+	    label = "Arbitrary Switch 4";
+	},
+	{
+	    cell = PSGroupCell;
+	},
+	{
+	    cell = PSLinkCell;
+	    detail = WBSThemesController;
+	    icon = Themes.png;
+	    label = Themes;
+	}
+    );
+    title = WinterBoard;
+}

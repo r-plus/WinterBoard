@@ -3,13 +3,13 @@ Priority: optional
 Section: System
 Maintainer: Jay Freeman (saurik) <saurik@saurik.com>
 Architecture: iphoneos-arm
-Version: 0.9.2993-1
+Version: 0.9.3017-1
 Description: more powerful, open-source SummerBoard
 Name: WinterBoard
-Depends: mobilesubstrate (>= 0.9.2958-1), killall
+Depends: mobilesubstrate (>= 0.9.2958-1), killall, preferenceloader
 Provides: theme-manager
-Conflicts: com.modmyifone.winterboardicon
-Replaces: com.modmyifone.winterboardicon
+Conflicts: com.modmyifone.winterboardicon, winterboardsettings, themesettings
+Replaces: com.modmyifone.winterboardicon, winterboardsettings, themesettings
 Author: Jay Freeman (saurik) <saurik@saurik.com>
 Depiction: http://cydia.saurik.com/info/winterboard/
 Homepage: http://www.saurik.com/id/9
