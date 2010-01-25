@@ -919,6 +919,7 @@ WBDelegate(time_)
 }
 
 - (id) initWithBadge:(NSString *)badge;
+- (NSString *) description;
 
 @end
 
@@ -932,6 +933,10 @@ WBDelegate(time_)
 - (id) initWithBadge:(NSString *)badge {
     badge_ = [badge retain];
     return self;
+}
+
+- (NSString *) description {
+    return [badge_ description];
 }
 
 WBDelegate(badge_)
