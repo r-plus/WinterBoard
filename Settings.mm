@@ -272,15 +272,10 @@ static NSString *_plist;
 @implementation WBSettingsController
 
 + (void) load {
-    NSLog(@"LH");
     void *libhide(dlopen("/usr/lib/hide.dylib", RTLD_LAZY));
-    NSLog(@"LH:%x", libhide);
     IsIconHiddenDisplayId = reinterpret_cast<BOOL (*)(NSString *)>(dlsym(libhide, "IsIconHiddenDisplayId"));
-    NSLog(@"LH:%x", IsIconHiddenDisplayId);
     HideIconViaDisplayId = reinterpret_cast<BOOL (*)(NSString *)>(dlsym(libhide, "HideIconViaDisplayId"));
-    NSLog(@"LH:%x", HideIconViaDisplayId);
     UnHideIconViaDisplayId = reinterpret_cast<BOOL (*)(NSString *)>(dlsym(libhide, "UnHideIconViaDisplayId"));
-    NSLog(@"LH:%x", UnHideIconViaDisplayId);
 }
 
 - (id) initForContentSize:(CGSize)size {
