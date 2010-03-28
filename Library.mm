@@ -1,5 +1,5 @@
 /* WinterBoard - Theme Manager for the iPhone
- * Copyright (C) 2008-2009  Jay Freeman (saurik)
+ * Copyright (C) 2008-2010  Jay Freeman (saurik)
 */
 
 /*
@@ -270,6 +270,8 @@ static NSString *$pathForIcon$(SBApplication *self) {
         if (NSString *name = Name) \
             [names addObject:[NSString stringWithFormat:@"Icons/%@.png", name]];
 
+    if (![didentifier isEqualToString:identifier])
+        testForIcon(didentifier);
     testForIcon(identifier);
     testForIcon(dname);
 
