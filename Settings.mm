@@ -42,6 +42,14 @@
 #import <Preferences/PSTableCell.h>
 #import <UIKit/UINavigationButton.h>
 
+#include <dlfcn.h>
+
+static BOOL (*IsIconHiddenDisplayId)(NSString *);
+static BOOL (*HideIconViaDisplayId)(NSString *);
+static BOOL (*UnHideIconViaDisplayId)(NSString *);
+
+static const NSString *WinterBoardDisplayID = @"com.saurik.WinterBoard";
+
 extern NSString *PSTableCellKey;
 extern "C" UIImage *_UIImageWithName(NSString *);
 
@@ -76,6 +84,7 @@ static NSString *_plist;
 - (UITableViewCellEditingStyle) tableView:(UITableView *)tableView editingStyleForRowAtIndexPath:(NSIndexPath *)indexPath;
 - (BOOL) tableView:(UITableView *)tableView shouldIndentWhileEditingRowAtIndexPath:(NSIndexPath *)indexPath;
 - (BOOL) tableView:(UITableView *)tableView canMoveRowAtIndexPath:(NSIndexPath *)indexPath;
+
 @end
 
 @implementation WBSThemesController
@@ -262,10 +271,24 @@ static NSString *_plist;
 
 @implementation WBSettingsController
 
++ (void) load {
+    NSLog(@"LH");
+    void *libhide(dlopen("/usr/lib/hide.dylib", RTLD_LAZY));
+    NSLog(@"LH:%x", libhide);
+    IsIconHiddenDisplayId = reinterpret_cast<BOOL (*)(NSString *)>(dlsym(libhide, "IsIconHiddenDisplayId"));
+    NSLog(@"LH:%x", IsIconHiddenDisplayId);
+    HideIconViaDisplayId = reinterpret_cast<BOOL (*)(NSString *)>(dlsym(libhide, "HideIconViaDisplayId"));
+    NSLog(@"LH:%x", HideIconViaDisplayId);
+    UnHideIconViaDisplayId = reinterpret_cast<BOOL (*)(NSString *)>(dlsym(libhide, "UnHideIconViaDisplayId"));
+    NSLog(@"LH:%x", UnHideIconViaDisplayId);
+}
+
 - (id) initForContentSize:(CGSize)size {
     if ((self = [super initForContentSize:size]) != nil) {
         _plist = [[NSString stringWithFormat:@"%@/Library/Preferences/com.saurik.WinterBoard.plist", NSHomeDirectory()] retain];
         _settings = [([NSMutableDictionary dictionaryWithContentsOfFile:_plist] ?: [NSMutableDictionary dictionary]) retain];
+
+        [_settings setObject:[NSNumber numberWithBool:IsIconHiddenDisplayId(WinterBoardDisplayID)] forKey:@"IconHidden"];
     } return self;
 }
 
@@ -285,10 +308,16 @@ static NSString *_plist;
     if (![data writeToFile:_plist options:NSAtomicWrite error:NULL])
         return;
 
+    ([[_settings objectForKey:@"IconHidden"] boolValue] ? HideIconViaDisplayId : UnHideIconViaDisplayId)(WinterBoardDisplayID);
+
     unlink("/User/Library/Caches/com.apple.springboard-imagecache-icons");
     unlink("/User/Library/Caches/com.apple.springboard-imagecache-icons.plist");
     unlink("/User/Library/Caches/com.apple.springboard-imagecache-smallicons");
     unlink("/User/Library/Caches/com.apple.springboard-imagecache-smallicons.plist");
+
+    system("rm -rf /User/Library/Caches/SpringBoardIconCache");
+    system("rm -rf /User/Library/Caches/SpringBoardIconCache-small");
+
     system("killall SpringBoard");
 }
 
@@ -332,9 +361,10 @@ static NSString *_plist;
 }
 
 - (void) setPreferenceValue:(id)value specifier:(PSSpecifier *)spec {
+    NSString *key([spec propertyForKey:@"key"]);
     if ([[spec propertyForKey:@"negate"] boolValue])
         value = [NSNumber numberWithBool:(![value boolValue])];
-    [_settings setValue:value forKey:[spec propertyForKey:@"key"]];
+    [_settings setValue:value forKey:key];
     [self settingsChanged];
 }
 
