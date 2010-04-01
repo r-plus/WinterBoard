@@ -60,6 +60,77 @@ static BOOL settingsChanged;
 static NSMutableDictionary *_settings;
 static NSString *_plist;
 
+/* [NSObject yieldToSelector:(withObject:)] {{{*/
+@interface NSObject (wb$yieldToSelector)
+- (id) wb$yieldToSelector:(SEL)selector withObject:(id)object;
+- (id) wb$yieldToSelector:(SEL)selector;
+@end
+
+@implementation NSObject (Cydia)
+
+- (void) wb$doNothing {
+}
+
+- (void) wb$_yieldToContext:(NSMutableArray *)context {
+    NSAutoreleasePool *pool([[NSAutoreleasePool alloc] init]);
+
+    SEL selector(reinterpret_cast<SEL>([[context objectAtIndex:0] pointerValue]));
+    id object([[context objectAtIndex:1] nonretainedObjectValue]);
+    volatile bool &stopped(*reinterpret_cast<bool *>([[context objectAtIndex:2] pointerValue]));
+
+    /* XXX: deal with exceptions */
+    id value([self performSelector:selector withObject:object]);
+
+    NSMethodSignature *signature([self methodSignatureForSelector:selector]);
+    [context removeAllObjects];
+    if ([signature methodReturnLength] != 0 && value != nil)
+        [context addObject:value];
+
+    stopped = true;
+
+    [self
+        performSelectorOnMainThread:@selector(wb$doNothing)
+        withObject:nil
+        waitUntilDone:NO
+    ];
+
+    [pool release];
+}
+
+- (id) wb$yieldToSelector:(SEL)selector withObject:(id)object {
+    /*return [self performSelector:selector withObject:object];*/
+
+    volatile bool stopped(false);
+
+    NSMutableArray *context([NSMutableArray arrayWithObjects:
+        [NSValue valueWithPointer:selector],
+        [NSValue valueWithNonretainedObject:object],
+        [NSValue valueWithPointer:const_cast<bool *>(&stopped)],
+    nil]);
+
+    NSThread *thread([[[NSThread alloc]
+        initWithTarget:self
+        selector:@selector(wb$_yieldToContext:)
+        object:context
+    ] autorelease]);
+
+    [thread start];
+
+    NSRunLoop *loop([NSRunLoop currentRunLoop]);
+    NSDate *future([NSDate distantFuture]);
+
+    while (!stopped && [loop runMode:NSDefaultRunLoopMode beforeDate:future]);
+
+    return [context count] == 0 ? nil : [context objectAtIndex:0];
+}
+
+- (id) wb$yieldToSelector:(SEL)selector {
+    return [self wb$yieldToSelector:selector withObject:nil];
+}
+
+@end
+/* }}} */
+
 /* Theme Settings Controller {{{ */
 @interface WBSThemesController: PSViewController <UITableViewDelegate, UITableViewDataSource> {
     UITableView *_tableView;
@@ -291,6 +362,29 @@ static NSString *_plist;
     [_settings release];
     [_plist release];
     [super dealloc];
+}
+
+- (void) _optimizeThemes {
+    system("/usr/libexec/winterboard/Optimize");
+}
+
+- (void) optimizeThemes {
+    UIView *view([self view]);
+    UIWindow *window([view window]);
+
+    UIProgressHUD *hud([[[UIProgressHUD alloc] initWithWindow:window] autorelease]);
+    [hud setText:@"Reticulating Splines\nPlease Wait (Minutes)"];
+
+    [window setUserInteractionEnabled:NO];
+
+    [window addSubview:hud];
+    [hud show:YES];
+    [self wb$yieldToSelector:@selector(_optimizeThemes)];
+    [hud removeFromSuperview];
+
+    [window setUserInteractionEnabled:YES];
+
+    [self settingsChanged];
 }
 
 - (void) suspend {

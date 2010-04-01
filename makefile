@@ -4,7 +4,7 @@ else
 target := $(PKG_TARG)-
 endif
 
-all: WinterBoard WinterBoard.dylib UIImages WinterBoardSettings
+all: WinterBoard WinterBoard.dylib UIImages WinterBoardSettings Optimize
 
 clean:
 	rm -f WinterBoard WinterBoard.dylib UIImages
@@ -25,7 +25,11 @@ WinterBoard: Application.mm makefile
 	$(target)g++ -g0 -O2 -Wall -Werror -o $@ $(filter %.mm,$^) -framework UIKit -framework Foundation -framework CoreFoundation -lobjc -framework CoreGraphics -I/apl/sdk -framework Preferences -F$(PKG_ROOT)/System/Library/PrivateFrameworks
 	ldid -S $@
 
-package:
+Optimize: Optimize.cpp makefile
+	$(target)g++ -g0 -O2 -Wall -Werror -o $@ $(filter %.cpp,$^)
+	ldid -S $@
+
+package: all
 	rm -rf winterboard
 	mkdir -p winterboard/DEBIAN
 	mkdir -p winterboard/Applications/WinterBoard.app
@@ -33,6 +37,9 @@ package:
 	mkdir -p winterboard/Library/MobileSubstrate/DynamicLibraries
 	mkdir -p winterboard/Library/PreferenceLoader/Preferences
 	mkdir -p winterboard/System/Library/PreferenceBundles
+	mkdir -p winterboard/usr/libexec/winterboard
+	cp -a Optimize winterboard/usr/libexec/winterboard
+	chmod 6755 winterboard/usr/libexec/winterboard/Optimize
 	cp -a WinterBoardSettings.plist winterboard/Library/PreferenceLoader/Preferences
 	cp -a WinterBoardSettings.bundle winterboard/System/Library/PreferenceBundles
 	cp -a Icon-Small.png winterboard/System/Library/PreferenceBundles/WinterBoardSettings.bundle/icon.png

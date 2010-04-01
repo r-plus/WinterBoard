@@ -172,6 +172,7 @@ static BOOL (*_GSFontGetUseLegacyFontMetrics)();
 
 bool Debug_ = false;
 bool Engineer_ = false;
+bool SummerBoard_ = true;
 
 static UIImage *(*_UIApplicationImageWithName)(NSString *name);
 static UIImage *(*_UIImageAtPath)(NSString *name, NSBundle *path);
@@ -239,7 +240,7 @@ static NSString *$pathForFile$inBundle$(NSString *file, NSBundle *bundle, bool u
         [names addObject:[NSString stringWithFormat:@"Bundles/com.apple.MobileSMS/%@", file]];
     else if ([identifier isEqualToString:@"com.apple.calculator"])
         [names addObject:[NSString stringWithFormat:@"Files/Applications/Calculator.app/%@", file]];
-    else if (![identifier isEqualToString:@"com.apple.springboard"]);
+    else if (![identifier isEqualToString:@"com.apple.springboard"] || !SummerBoard_);
         remapResourceName(@"FSO_BG.png", @"StatusBar")
         remapResourceName(@"SBDockBG.png", @"Dock")
         remapResourceName(@"SBWeatherCelsius.png", @"Icons/Weather")
@@ -261,10 +262,11 @@ static NSString *$pathForIcon$(SBApplication *self) {
 
     NSMutableArray *names = [NSMutableArray arrayWithCapacity:8];
 
+    /* XXX: I might need to keep this for backwards compatibility
     if (identifier != nil)
         [names addObject:[NSString stringWithFormat:@"Bundles/%@/icon.png", identifier]];
     if (folder != nil)
-        [names addObject:[NSString stringWithFormat:@"Folders/%@/icon.png", folder]];
+        [names addObject:[NSString stringWithFormat:@"Folders/%@/icon.png", folder]]; */
 
     #define testForIcon(Name) \
         if (NSString *name = Name) \
@@ -744,7 +746,7 @@ MSHook(id, SBUIController$init, SBUIController *self, SEL sel) {
             [controller_ play:&error];
 #elif UseMPMoviePlayerController
             NSURL *url([NSURL fileURLWithPath:mp4]);
-            MPMoviePlayerController *controller = [[MPMoviePlayerController alloc] initWithContentURL:url];
+            MPMoviePlayerController *controller = [[$MPMoviePlayerController alloc] initWithContentURL:url];
 	    controller.movieControlMode = MPMovieControlModeHidden;
 	    [controller play];
 #else
@@ -1388,7 +1390,7 @@ static void dlset(Type_ &function, const char *name) {
 }
 
 extern "C" void WBInitialize() {
-    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    NSAutoreleasePool *pool([[NSAutoreleasePool alloc] init]);
 
     NSString *identifier([[NSBundle mainBundle] bundleIdentifier]);
 
@@ -1443,8 +1445,8 @@ extern "C" void WBInitialize() {
 
     _UIImage$defaultDesktopImage = MSHookMessage(object_getClass($UIImage), @selector(defaultDesktopImage), &$UIImage$defaultDesktopImage);
 
-    //WBRename("UINavigationBar", @selector(initWithCoder:", (IMP) &UINavigationBar$initWithCoder$);
-    //WBRename("UINavigationBarBackground", @selector(initWithFrame:withBarStyle:withTintColor:", (IMP) &UINavigationBarBackground$initWithFrame$withBarStyle$withTintColor$);
+    //WBRename("UINavigationBar", @selector(initWithCoder:), (IMP) &UINavigationBar$initWithCoder$);
+    //WBRename("UINavigationBarBackground", @selector(initWithFrame:withBarStyle:withTintColor:), (IMP) &UINavigationBarBackground$initWithFrame$withBarStyle$withTintColor$);
 
     _UINavigationBar$setBarStyle$ = MSHookMessage($UINavigationBar, @selector(setBarStyle:), &$UINavigationBar$setBarStyle$);
     _UIToolbar$setBarStyle$ = MSHookMessage($UIToolbar, @selector(setBarStyle:), &$UIToolbar$setBarStyle$);
@@ -1458,30 +1460,31 @@ extern "C" void WBInitialize() {
 
     themes_ = [[NSMutableArray alloc] initWithCapacity:8];
 
-    if (NSDictionary *settings = [[NSDictionary alloc] initWithContentsOfFile:[NSString stringWithFormat:@"/User/Library/Preferences/com.saurik.WinterBoard.plist"]]) {
-        [settings autorelease];
+    if (NSDictionary *settings = [NSDictionary dictionaryWithContentsOfFile:[NSString stringWithFormat:@"/User/Library/Preferences/com.saurik.WinterBoard.plist"]]) {
+        if (NSNumber *value = [settings objectForKey:@"SummerBoard"])
+            SummerBoard_ = [value boolValue];
+        if (NSNumber *value = [settings objectForKey:@"Debug"])
+            Debug_ = [value boolValue];
 
-        if (NSNumber *debug = [settings objectForKey:@"Debug"])
-            Debug_ = [debug boolValue];
-
-        NSArray *themes = [settings objectForKey:@"Themes"];
+        NSArray *themes([settings objectForKey:@"Themes"]);
         if (themes == nil)
             if (NSString *theme = [settings objectForKey:@"Theme"])
                 themes = [NSArray arrayWithObject:[NSDictionary dictionaryWithObjectsAndKeys:
                     theme, @"Name",
                     [NSNumber numberWithBool:true], @"Active",
                 nil]];
+
         if (themes != nil)
             for (NSDictionary *theme in themes) {
-                NSNumber *active = [theme objectForKey:@"Active"];
+                NSNumber *active([theme objectForKey:@"Active"]);
                 if (![active boolValue])
                     continue;
 
-                NSString *name = [theme objectForKey:@"Name"];
+                NSString *name([theme objectForKey:@"Name"]);
                 if (name == nil)
                     continue;
 
-                NSString *theme = nil;
+                NSString *theme(nil);
 
                 #define testForTheme(format...) \
                     if (theme == nil) { \
@@ -1495,18 +1498,17 @@ extern "C" void WBInitialize() {
                 testForTheme(@"/Library/Themes/%@.theme", name)
                 testForTheme(@"/Library/Themes/%@", name)
                 testForTheme(@"%@/Library/SummerBoard/Themes/%@", NSHomeDirectory(), name)
+
             }
     }
 
     Info_ = [[NSMutableDictionary dictionaryWithCapacity:16] retain];
 
     for (NSString *theme in themes_)
-        if (NSDictionary *info = [[NSDictionary alloc] initWithContentsOfFile:[NSString stringWithFormat:@"%@/Info.plist", theme]]) {
-            [info autorelease];
+        if (NSDictionary *info = [NSDictionary dictionaryWithContentsOfFile:[NSString stringWithFormat:@"%@/Info.plist", theme]])
             for (NSString *key in [info allKeys])
                 if ([Info_ objectForKey:key] == nil)
                     [Info_ setObject:[info objectForKey:key] forKey:key];
-        }
 
     bool sms($getTheme$([NSArray arrayWithObjects:@"SMSBackground.png", @"SMSBackground.jpg", nil]) != nil);
 
@@ -1540,12 +1542,16 @@ extern "C" void WBInitialize() {
             NULL, &ChangeWallpaper, (CFStringRef) @"com.saurik.winterboard.lockbackground", NULL, 0
         );
 
-        NSBundle *MediaPlayer = [NSBundle bundleWithPath:@"/System/Library/Frameworks/MediaPlayer.framework"];
-        if (MediaPlayer != nil)
-            [MediaPlayer load];
+        /*
+        if ($getTheme$([NSArray arrayWithObjects:@"Wallpaper.mp4"]) != nil) {
+            NSBundle *MediaPlayer([NSBundle bundleWithPath:@"/System/Library/Frameworks/MediaPlayer.framework"]);
+            if (MediaPlayer != nil)
+                [MediaPlayer load];
 
-        $MPMoviePlayerController = objc_getClass("MPMoviePlayerController");
-        $MPVideoView = objc_getClass("MPVideoView");
+            $MPMoviePlayerController = objc_getClass("MPMoviePlayerController");
+            $MPVideoView = objc_getClass("MPVideoView");
+        }*/
+
         $WebCoreFrameBridge = objc_getClass("WebCoreFrameBridge");
 
         $SBApplication = objc_getClass("SBApplication");
@@ -1572,8 +1578,11 @@ extern "C" void WBInitialize() {
 
         WBRename(WebCoreFrameBridge, renderedSizeOfNode:constrainedToWidth:, renderedSizeOfNode$constrainedToWidth$);
 
-        WBRename(SBApplication, pathForIcon, pathForIcon);
-        WBRename(SBApplicationIcon, icon, icon);
+        if (SummerBoard_) {
+            WBRename(SBApplication, pathForIcon, pathForIcon);
+            WBRename(SBApplicationIcon, icon, icon);
+        }
+
         WBRename(SBBookmarkIcon, icon, icon);
         WBRename(SBButtonBar, didMoveToSuperview, didMoveToSuperview);
         WBRename(SBCalendarIconContentsView, drawRect:, drawRect$);

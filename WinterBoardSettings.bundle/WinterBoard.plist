@@ -2,7 +2,8 @@
     items = ({
         cell = PSSwitchCell;
         key = IconHidden;
-        label = "Hide Application";
+        default = 0;
+        label = "Hide WinterBoard";
     }, {
         cell = PSGroupCell;
 	isStaticText = true;
@@ -12,10 +13,34 @@
     }, {
         cell = PSGroupCell;
     }, {
+        cell = PSSwitchCell;
+        key = SummerBoard;
+        default = 1;
+        label = "SummerBoard Mode";
+    }, {
+        cell = PSSwitchCell;
+        key = Debug;
+        default = 0;
+        label = "Debug Logging";
+    }, {
+        cell = PSGroupCell;
+    }, {
         cell = PSLinkCell;
         detail = WBSThemesController;
         icon = Themes.png;
-        label = Themes;
+        label = "Select Themes";
+    }, {
+        cell = PSGroupCell;
+    }, {
+        cell = PSButtonCell;
+        action = optimizeThemes;
+        label = "Optimize Themes (v1.0)";
+    }, {
+        cell = PSGroupCell;
+	isStaticText = true;
+    }, {
+        cell = PSTitleValueCell;
+        label = "iPhone-optimize PNGs (for speed).";
     });
 
     title = WinterBoard;
