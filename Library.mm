@@ -274,8 +274,12 @@ static NSString *$pathForIcon$(SBApplication *self) {
 
     if (![didentifier isEqualToString:identifier])
         testForIcon(didentifier);
+
     testForIcon(identifier);
     testForIcon(dname);
+
+    if ([identifier isEqualToString:@"com.apple.MobileSMS"])
+        testForIcon(@"SMS");
 
     if (didentifier != nil) {
         testForIcon([English_ objectForKey:didentifier]);
@@ -288,6 +292,7 @@ static NSString *$pathForIcon$(SBApplication *self) {
 
     if (NSString *path = $getTheme$(names))
         return path;
+
     return nil;
 }
 
@@ -1619,7 +1624,9 @@ extern "C" void WBInitialize() {
         WBRename(SBStatusBarOperatorNameView, setOperatorName:fullSize:, setOperatorName$fullSize$);
         WBRename(SBStatusBarTimeView, drawRect:, drawRect$);
 
-        English_ = [[NSDictionary alloc] initWithContentsOfFile:@"/System/Library/CoreServices/SpringBoard.app/English.lproj/LocalizedApplicationNames.strings"];
+        if (SummerBoard_)
+            English_ = [[NSDictionary alloc] initWithContentsOfFile:@"/System/Library/CoreServices/SpringBoard.app/English.lproj/LocalizedApplicationNames.strings"];
+
         Cache_ = [[NSMutableDictionary alloc] initWithCapacity:64];
     }
 
