@@ -1547,15 +1547,14 @@ extern "C" void WBInitialize() {
             NULL, &ChangeWallpaper, (CFStringRef) @"com.saurik.winterboard.lockbackground", NULL, 0
         );
 
-        /*
-        if ($getTheme$([NSArray arrayWithObjects:@"Wallpaper.mp4"]) != nil) {
+        if ($getTheme$([NSArray arrayWithObject:@"Wallpaper.mp4"]) != nil) {
             NSBundle *MediaPlayer([NSBundle bundleWithPath:@"/System/Library/Frameworks/MediaPlayer.framework"]);
             if (MediaPlayer != nil)
                 [MediaPlayer load];
 
             $MPMoviePlayerController = objc_getClass("MPMoviePlayerController");
             $MPVideoView = objc_getClass("MPVideoView");
-        }*/
+        }
 
         $WebCoreFrameBridge = objc_getClass("WebCoreFrameBridge");
 
