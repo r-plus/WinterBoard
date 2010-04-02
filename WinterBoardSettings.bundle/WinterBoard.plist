@@ -40,7 +40,7 @@
 	isStaticText = true;
     }, {
         cell = PSTitleValueCell;
-        label = "iPhone-optimize PNGs (for speed).";
+        label = "iPhone-optimize PNGs (for speed).\n\nPlease note that this setting /replaces/ the PNG files that came with the theme. PNG files that have been iPhone-optimized cannot be viewed on a normal computer unless they are first deoptimized. You can use Cydia to reinstall themes that have been optimized in order to revert to the originals.";
     });
 
     title = WinterBoard;
