@@ -1,5 +1,5 @@
 /* WinterBoard - Theme Manager for the iPhone
- * Copyright (C) 2009  Jay Freeman (saurik)
+ * Copyright (C) 2009-2010  Jay Freeman (saurik)
 */
 
 /*
@@ -364,11 +364,26 @@ static NSString *_plist;
     [super dealloc];
 }
 
-- (void) _optimizeThemes {
+- (void) __optimizeThemes {
     system("/usr/libexec/winterboard/Optimize");
 }
 
 - (void) optimizeThemes {
+    UIActionSheet *sheet([[[UIActionSheet alloc]
+        initWithTitle:@"Optimize Themes"
+        buttons:[NSArray arrayWithObjects:@"Optimize", @"Cancel", nil]
+        defaultButtonIndex:1
+        delegate:self
+        context:@"optimize"
+    ] autorelease]);
+
+    [sheet setBodyText:@"Please note that this setting /replaces/ the PNG files that came with the theme. PNG files that have been iPhone-optimized cannot be viewed on a normal computer unless they are first deoptimized. You can use Cydia to reinstall themes that have been optimized in order to revert to the original PNG files."];
+    [sheet setNumberOfRows:1];
+    [sheet setDestructiveButtonIndex:0];
+    [sheet popupAlertAnimated:YES];
+}
+
+- (void) _optimizeThemes {
     UIView *view([self view]);
     UIWindow *window([view window]);
 
@@ -379,12 +394,28 @@ static NSString *_plist;
 
     [window addSubview:hud];
     [hud show:YES];
-    [self wb$yieldToSelector:@selector(_optimizeThemes)];
+    [self wb$yieldToSelector:@selector(__optimizeThemes)];
     [hud removeFromSuperview];
 
     [window setUserInteractionEnabled:YES];
 
     [self settingsChanged];
+}
+
+- (void) alertSheet:(UIActionSheet *)sheet buttonClicked:(int)button {
+    NSString *context([sheet context]);
+
+    if ([context isEqualToString:@"optimize"]) {
+        switch (button) {
+            case 1:
+                [self performSelector:@selector(_optimizeThemes) withObject:nil afterDelay:0];
+            break;
+        }
+
+        [sheet dismiss];
+    } else
+        [super alertSheet:sheet buttonClicked:button];
+
 }
 
 - (void) suspend {
