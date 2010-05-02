@@ -592,21 +592,28 @@ MSHook(void, SBCalendarIconContentsView$drawRect$, SBCalendarIconContentsView *s
 
     CFRelease(formatter);
 
-    NSString *datestyle(@""
+    UIDevice *device([UIDevice currentDevice]);
+    bool isWild([device respondsToSelector:@selector(isWildcat)] && [device isWildcat]);
+
+    NSString *datestyle([@""
         "font-family: Helvetica; "
         "font-weight: bold; "
-        "font-size: 39px; "
         "color: #333333; "
         "alpha: 1.0; "
-    "");
+    "" stringByAppendingString:(isWild
+        ? @"font-size: 54px; "
+        : @"font-size: 39px; "
+    )]);
 
-    NSString *daystyle(@""
+    NSString *daystyle([@""
         "font-family: Helvetica; "
         "font-weight: bold; "
-        "font-size: 9px; "
         "color: white; "
         "text-shadow: rgba(0, 0, 0, 0.2) -1px -1px 2px; "
-    "");
+    "" stringByAppendingString:(isWild
+        ? @"font-size: 11px; "
+        : @"font-size: 9px; "
+    )]);
 
     if (NSString *style = [Info_ objectForKey:@"CalendarIconDateStyle"])
         datestyle = [datestyle stringByAppendingString:style];
@@ -618,14 +625,16 @@ MSHook(void, SBCalendarIconContentsView$drawRect$, SBCalendarIconContentsView *s
     CGSize datesize = [(NSString *)date sizeWithStyle:datestyle forWidth:(width + leeway)];
     CGSize daysize = [(NSString *)day sizeWithStyle:daystyle forWidth:(width + leeway)];
 
-    unsigned base($GSFontGetUseLegacyFontMetrics() ? 71 : 70);
+    unsigned base(isWild ? 89 : 70);
+    if ($GSFontGetUseLegacyFontMetrics())
+        base = base + 1;
 
     [(NSString *)date drawAtPoint:CGPointMake(
         (width + 1 - datesize.width) / 2, (base - datesize.height) / 2
     ) withStyle:datestyle];
 
     [(NSString *)day drawAtPoint:CGPointMake(
-        (width + 1 - daysize.width) / 2, (16 - daysize.height) / 2
+        (width + 1 - daysize.width) / 2, ((isWild ? 18 : 16) - daysize.height) / 2
     ) withStyle:daystyle];
 
     CFRelease(date);
