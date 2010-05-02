@@ -1192,14 +1192,21 @@ MSHook(void, SBIconLabel$drawRect$, SBIconLabel *self, SEL sel, CGRect rect) {
 
     NSString *label(MSHookIvar<NSString *>(self, "_label"));
 
+    UIDevice *device([UIDevice currentDevice]);
+    bool isWild([device respondsToSelector:@selector(isWildcat)] && [device isWildcat]);
+
     NSString *style = [NSString stringWithFormat:@""
         "font-family: Helvetica; "
         "font-weight: bold; "
-        "font-size: 11px; "
-        "color: %@; "
-    "", docked ? @"white" : @"#b3b3b3"];
+        "color: %@; %@"
+    "", (docked || !SummerBoard_ ? @"white" : @"#b3b3b3"), (isWild
+        ? @"font-size: 12px; "
+        : @"font-size: 11px; "
+    )];
 
-    if (docked)
+    if (isWild)
+        style = [style stringByAppendingString:@"text-shadow: rgba(0, 0, 0, 0.5) 0px 1px 0px; "];
+    else if (docked)
         style = [style stringByAppendingString:@"text-shadow: rgba(0, 0, 0, 0.5) 0px -1px 0px; "];
 
     bool ellipsis(false);
