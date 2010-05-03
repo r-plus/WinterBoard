@@ -41,53 +41,108 @@
 
 #import <Preferences/PSRootController.h>
 #import <Preferences/PSViewController.h>
+#import <Preferences/PSListController.h>
 #import <Preferences/PSSpecifier.h>
+
+static NSBundle *wbSettingsBundle;
+static Class $WBSettingsController;
 
 @interface UIApplication (Private)
 - (void) terminateWithSuccess;
 @end
 
+@interface UIDevice (Private)
+- (BOOL) isWildcat;
+@end
+
+@interface PSRootController (Compatibility)
+- (id) _popController; // < 3.2
+- (id) contentView; // < 3.2
+- (id) lastController; // < 3.2
+- (id) topViewController; // >= 3.2
+@end
+
+@interface PSListController (Compatibility)
+- (void) viewWillBecomeVisible:(void *)specifier; // < 3.2
+- (void) viewWillAppear:(BOOL)a; // >= 3.2
+- (void) setSpecifier:(PSSpecifier *)spec; // >= 3.2
+@end
+
 @interface WBRootController : PSRootController {
-    PSViewController *_firstViewController;
+    PSListController *_rootListController;
 }
 
-@property (readonly) PSViewController *firstViewController;
+@property (readonly) PSListController *rootListController;
 
 - (void) setupRootListForSize:(CGSize)size;
-- (BOOL) popController;
-
+- (id) topViewController;
 @end
 
 @implementation WBRootController
 
-@synthesize firstViewController = _firstViewController;
+@synthesize rootListController = _rootListController;
 
+// < 3.2
 - (void) setupRootListForSize:(CGSize)size {
-    PSSpecifier *spec = [[PSSpecifier alloc] init];
+    PSSpecifier *spec([[PSSpecifier alloc] init]);
     [spec setTarget:self];
     spec.name = @"WinterBoard";
 
-    NSBundle *wbSettingsBundle = [NSBundle bundleWithPath:@"/System/Library/PreferenceBundles/WinterBoardSettings.bundle"];
-    [wbSettingsBundle load];
-
-    _firstViewController = [[[wbSettingsBundle principalClass] alloc] initForContentSize:size];
-    _firstViewController.rootController = self;
-    _firstViewController.parentController = self;
-    [_firstViewController viewWillBecomeVisible:spec];
+    _rootListController = [[$WBSettingsController alloc] initForContentSize:size];
+    _rootListController.rootController = self;
+    _rootListController.parentController = self;
+    [_rootListController viewWillBecomeVisible:spec];
 
     [spec release];
 
-    [self pushController:_firstViewController];
+    [self pushController:_rootListController];
 }
 
-- (BOOL) popController {
+// >= 3.2
+- (void) loadView {
+    [super loadView];
+    [self pushViewController:[self rootListController] animated:NO];
+}
+
+- (PSListController *) rootListController {
+    if(!_rootListController) {
+        PSSpecifier *spec([[PSSpecifier alloc] init]);
+        [spec setTarget:self];
+        spec.name = @"WinterBoard";
+        _rootListController = [[$WBSettingsController alloc] initForContentSize:CGSizeZero];
+        _rootListController.rootController = self;
+        _rootListController.parentController = self;
+        [_rootListController setSpecifier:spec];
+        [spec release];
+    }
+    return _rootListController;
+}
+
+- (id) contentView {
+    if ([[PSRootController class] instancesRespondToSelector:@selector(contentView)]) {
+        return [super contentView];
+    } else {
+        return [super view];
+    }
+}
+
+- (id) topViewController {
+    if ([[PSRootController class] instancesRespondToSelector:@selector(topViewController)]) {
+        return [super topViewController];
+    } else {
+        return [super lastController];
+    }
+}
+
+- (id) _popController {
     // Pop the last controller = exit the application.
     // The only time the last controller should pop is when the user taps Respring/Cancel.
     // Which only gets displayed if the user has made changes.
-    if([self lastController] == _firstViewController)
+    if ([self topViewController] == _rootListController)
         [[UIApplication sharedApplication] terminateWithSuccess];
-    return [super popController];
+    return [super _popController];
 }
+
 @end
 
 @interface WBApplication : UIApplication {
@@ -104,20 +159,28 @@
 }
 
 - (void) applicationWillTerminate:(UIApplication *)application {
-    [_rootController.firstViewController suspend];
+    [_rootController.rootListController suspend];
 }
 
 - (void) applicationDidFinishLaunching:(id)unused {
-    UIWindow *window = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].applicationFrame];
+    wbSettingsBundle = [NSBundle bundleWithPath:@"/System/Library/PreferenceBundles/WinterBoardSettings.bundle"];
+    [wbSettingsBundle load];
+    $WBSettingsController = [wbSettingsBundle principalClass];
+
+    CGRect applicationFrame(([UIDevice instancesRespondToSelector:@selector(isWildcat)]
+                         && [[UIDevice currentDevice] isWildcat])
+                          ? [UIScreen mainScreen].bounds
+                          : [UIScreen mainScreen].applicationFrame);
+    UIWindow *window([[UIWindow alloc] initWithFrame:applicationFrame]);
     _rootController = [[WBRootController alloc] initWithTitle:@"WinterBoard" identifier:[[NSBundle mainBundle] bundleIdentifier]];
-    [window addSubview:_rootController.contentView];
+    [window addSubview:[_rootController contentView]];
     [window makeKeyAndVisible];
 }
 
 @end
 
 int main(int argc, char *argv[]) {
-    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    NSAutoreleasePool *pool( [[NSAutoreleasePool alloc] init]);
 
     int value = UIApplicationMain(argc, argv, @"WBApplication", @"WBApplication");
 
