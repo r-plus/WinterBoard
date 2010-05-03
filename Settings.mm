@@ -37,12 +37,15 @@
 
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
+#import <Preferences/PSRootController.h>
+#import <Preferences/PSViewController.h>
 #import <Preferences/PSListController.h>
 #import <Preferences/PSSpecifier.h>
 #import <Preferences/PSTableCell.h>
 #import <UIKit/UINavigationButton.h>
 
 #include <dlfcn.h>
+#include <objc/runtime.h>
 
 static BOOL (*IsIconHiddenDisplayId)(NSString *);
 static BOOL (*HideIconViaDisplayId)(NSString *);
@@ -234,7 +237,8 @@ static NSString *_plist;
         [_tableView setDelegate:self];
         [_tableView setEditing:YES];
         [_tableView setAllowsSelectionDuringEditing:YES];
-        [self showLeftButton:@"WinterBoard" withStyle:1 rightButton:nil withStyle:0];
+        if ([self respondsToSelector:@selector(setView:)])
+            [self setView:_tableView];
     }
     return self;
 }
@@ -441,6 +445,21 @@ static NSString *_plist;
     system("killall SpringBoard");
 }
 
+- (void) cancelChanges {
+    [_settings release];
+    [_plist release];
+    _plist = [[NSString stringWithFormat:@"%@/Library/Preferences/com.saurik.WinterBoard.plist", NSHomeDirectory()] retain];
+    _settings = [([NSMutableDictionary dictionaryWithContentsOfFile:_plist] ?: [NSMutableDictionary dictionary]) retain];
+
+    [_settings setObject:[NSNumber numberWithBool:IsIconHiddenDisplayId(WinterBoardDisplayID)] forKey:@"IconHidden"];
+    [self reloadSpecifiers];
+    if (![[PSViewController class] instancesRespondToSelector:@selector(showLeftButton:withStyle:rightButton:withStyle:)]) {
+        self.navigationItem.leftBarButtonItem = nil;
+        self.navigationItem.rightBarButtonItem = nil;
+    }
+    settingsChanged = NO;
+}
+
 - (void) navigationBarButtonClicked:(int)buttonIndex {
     if (!settingsChanged) {
         [super navigationBarButtonClicked:buttonIndex];
@@ -448,16 +467,26 @@ static NSString *_plist;
     }
 
     if (buttonIndex == 0)
-        settingsChanged = NO;
+        [self cancelChanges];
 
     [self suspend];
     [self.rootController popController];
+}
+
+- (void) settingsConfirmButtonClicked:(UIBarButtonItem *)button {
+    [self navigationBarButtonClicked:button.tag];
 }
 
 - (void) viewWillRedisplay {
     if (settingsChanged)
         [self settingsChanged];
     [super viewWillRedisplay];
+}
+
+- (void) viewWillAppear:(BOOL)animated {
+    if (settingsChanged)
+        [self settingsChanged];
+    [super viewWillAppear:animated];
 }
 
 - (void) pushController:(id)controller {
@@ -472,7 +501,18 @@ static NSString *_plist;
 }
 
 - (void) settingsChanged {
-    [self showLeftButton:@"Respring" withStyle:2 rightButton:@"Cancel" withStyle:0];
+    if (![[PSViewController class] instancesRespondToSelector:@selector(showLeftButton:withStyle:rightButton:withStyle:)]) {
+        UIBarButtonItem *respringButton([[UIBarButtonItem alloc] initWithTitle:@"Respring" style:UIBarButtonItemStyleDone target:self action:@selector(settingsConfirmButtonClicked:)]);
+        UIBarButtonItem *cancelButton([[UIBarButtonItem alloc] initWithTitle:@"Cancel" style:UIBarButtonItemStylePlain target:self action:@selector(settingsConfirmButtonClicked:)]);
+        cancelButton.tag = 0;
+        respringButton.tag = 1;
+        self.navigationItem.leftBarButtonItem = respringButton;
+        self.navigationItem.rightBarButtonItem = cancelButton;
+        [respringButton release];
+        [cancelButton release];
+    } else {
+        [self showLeftButton:@"Respring" withStyle:2 rightButton:@"Cancel" withStyle:0];
+    }
     settingsChanged = YES;
 }
 
@@ -500,3 +540,23 @@ static NSString *_plist;
 }
 
 @end
+
+#define WBSAddMethod(_class, _sel, _imp, _type) \
+    if (![[_class class] instancesRespondToSelector:@selector(_sel)]) \
+        class_addMethod([_class class], @selector(_sel), (IMP)_imp, _type)
+void $PSRootController$popController(PSRootController *self, SEL _cmd) {
+    [self popViewControllerAnimated:YES];
+}
+
+void $PSViewController$hideNavigationBarButtons(PSRootController *self, SEL _cmd) {
+}
+
+id $PSViewController$initForContentSize$(PSRootController *self, SEL _cmd, CGRect contentSize) {
+    return [self init];
+}
+
+static __attribute__((constructor)) void __wbsInit() {
+    WBSAddMethod(PSRootController, popController, $PSRootController$popController, "v@:");
+    WBSAddMethod(PSViewController, hideNavigationBarButtons, $PSViewController$hideNavigationBarButtons, "v@:");
+    WBSAddMethod(PSViewController, initForContentSize:, $PSViewController$initForContentSize$, "@@:{ff}");
+}
