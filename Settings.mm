@@ -456,6 +456,8 @@ static NSString *_plist;
     if (![[PSViewController class] instancesRespondToSelector:@selector(showLeftButton:withStyle:rightButton:withStyle:)]) {
         self.navigationItem.leftBarButtonItem = nil;
         self.navigationItem.rightBarButtonItem = nil;
+    } else {
+        [self showLeftButton:nil withStyle:0 rightButton:nil withStyle:0];
     }
     settingsChanged = NO;
 }
@@ -466,8 +468,10 @@ static NSString *_plist;
         return;
     }
 
-    if (buttonIndex == 0)
+    if (buttonIndex == 0) {
         [self cancelChanges];
+        return;
+    }
 
     [self suspend];
     [self.rootController popController];
