@@ -172,9 +172,10 @@ static BOOL (*_GSFontGetUseLegacyFontMetrics)();
 #define $GSFontGetUseLegacyFontMetrics() \
     (_GSFontGetUseLegacyFontMetrics == NULL ? YES : _GSFontGetUseLegacyFontMetrics())
 
-bool Debug_ = false;
-bool Engineer_ = false;
-bool SummerBoard_ = true;
+static bool Debug_ = false;
+static bool Engineer_ = false;
+static bool SummerBoard_ = true;
+static bool SpringBoard_;
 
 static UIImage *(*_UIApplicationImageWithName)(NSString *name);
 static UIImage *(*_UIImageAtPath)(NSString *name, NSBundle *path);
@@ -237,18 +238,21 @@ static NSString *$pathForFile$inBundle$(NSString *file, NSBundle *bundle, bool u
         else if ([file isEqualToString:oldname]) \
             [names addObject:[NSString stringWithFormat:@"%@.png", newname]]; \
 
+    bool summer(SpringBoard_ && SummerBoard_);
+
     if (identifier == nil);
     else if ([identifier isEqualToString:@"com.apple.chatkit"])
         [names addObject:[NSString stringWithFormat:@"Bundles/com.apple.MobileSMS/%@", file]];
     else if ([identifier isEqualToString:@"com.apple.calculator"])
         [names addObject:[NSString stringWithFormat:@"Files/Applications/Calculator.app/%@", file]];
-    else if (![identifier isEqualToString:@"com.apple.springboard"] || !SummerBoard_);
+    else if (!summer);
         remapResourceName(@"FSO_BG.png", @"StatusBar")
         remapResourceName(@"SBDockBG.png", @"Dock")
         remapResourceName(@"SBWeatherCelsius.png", @"Icons/Weather")
 
     if (NSString *path = $getTheme$(names))
         return path;
+
     return nil;
 }
 
@@ -512,7 +516,20 @@ static UIImage *CachedImageAtPath(NSString *path) {
 MSHook(CGImageRef, _UIImageRefAtPath, NSString *name, bool cache, UIImageOrientation *orientation) {
     if (Debug_)
         NSLog(@"WB:Debug: _UIImageRefAtPath(\"%@\", %s)", name, cache ? "true" : "false");
-    return __UIImageRefAtPath([name wb$themedPath], cache, orientation);
+
+    NSString *themed([name wb$themedPath]);
+
+    if (false && SpringBoard_ && SummerBoard_ && themed == name) {
+        if ([name isEqualToString:@"/System/Library/CoreServices/SpringBoard.app/SBDockBGT-Portrait.png"])
+            if (NSString *path = $getTheme$([NSArray arrayWithObject:@"Dock.png"])) {
+                UIImage *image([UIImage imageWithContentsOfFile:path]);
+                CGImageRef ref([[image _imageScaledToProportion:2.4 interpolationQuality:5] imageRef]);
+                CGImageRetain(ref);
+                return ref;
+            }
+    }
+
+    return __UIImageRefAtPath(themed, cache, orientation);
 }
 
 /*MSHook(UIImage *, _UIImageAtPath, NSString *name, NSBundle *bundle) {
@@ -1365,6 +1382,8 @@ MSHook(GSFontRef, GSFontCreateWithName, const char *name, GSFontSymbolicTraits t
         NSLog(@"WB:Debug: GSFontCreateWithName(\"%s\", %f)", name, size);
     if (NSString *font = [Info_ objectForKey:[NSString stringWithFormat:@"FontName-%s", name]])
         name = [font UTF8String];
+    //if (NSString *scale = [Info_ objectForKey:[NSString stringWithFormat:@"FontScale-%s", name]])
+    //    size *= [scale floatValue];
     return _GSFontCreateWithName(name, traits, size);
 }
 
@@ -1560,6 +1579,8 @@ extern "C" void WBInitialize() {
 
     bool sms($getTheme$([NSArray arrayWithObjects:@"SMSBackground.png", @"SMSBackground.jpg", nil]) != nil);
 
+    SpringBoard_ = [identifier isEqualToString:@"com.apple.springboard"];
+
     if ([NSBundle bundleWithIdentifier:@"com.apple.chatkit"])
         if (sms) {
             $CKMessageCell = objc_getClass("CKMessageCell");
@@ -1584,7 +1605,7 @@ extern "C" void WBInitialize() {
                 _TranscriptController$loadView = MSHookMessage(mSMSMessageTranscriptController, @selector(loadView), &$TranscriptController$loadView);
             }
         }
-    } else if ([identifier isEqualToString:@"com.apple.springboard"]) {
+    } else if (SpringBoard_) {
         CFNotificationCenterAddObserver(
             CFNotificationCenterGetDarwinNotifyCenter(),
             NULL, &ChangeWallpaper, (CFStringRef) @"com.saurik.winterboard.lockbackground", NULL, 0
