@@ -134,13 +134,13 @@ static Class $WBSettingsController;
     }
 }
 
-- (id) _popController {
+- (void) _popController {
     // Pop the last controller = exit the application.
     // The only time the last controller should pop is when the user taps Respring/Cancel.
     // Which only gets displayed if the user has made changes.
     if ([self topViewController] == _rootListController)
         [[UIApplication sharedApplication] terminateWithSuccess];
-    return [super _popController];
+    [super _popController];
 }
 
 @end

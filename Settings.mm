@@ -454,8 +454,8 @@ static NSString *_plist;
     [_settings setObject:[NSNumber numberWithBool:IsIconHiddenDisplayId(WinterBoardDisplayID)] forKey:@"IconHidden"];
     [self reloadSpecifiers];
     if (![[PSViewController class] instancesRespondToSelector:@selector(showLeftButton:withStyle:rightButton:withStyle:)]) {
-        self.navigationItem.leftBarButtonItem = nil;
-        self.navigationItem.rightBarButtonItem = nil;
+        [[self navigationItem] setLeftBarButtonItem:nil];
+        [[self navigationItem] setRightBarButtonItem:nil];
     } else {
         [self showLeftButton:nil withStyle:0 rightButton:nil withStyle:0];
     }
@@ -490,7 +490,8 @@ static NSString *_plist;
 - (void) viewWillAppear:(BOOL)animated {
     if (settingsChanged)
         [self settingsChanged];
-    [super viewWillAppear:animated];
+    if ([super respondsToSelector:@selector(viewWillAppear:)])
+        [super viewWillAppear:animated];
 }
 
 - (void) pushController:(id)controller {
@@ -510,8 +511,8 @@ static NSString *_plist;
         UIBarButtonItem *cancelButton([[UIBarButtonItem alloc] initWithTitle:@"Cancel" style:UIBarButtonItemStylePlain target:self action:@selector(settingsConfirmButtonClicked:)]);
         cancelButton.tag = 0;
         respringButton.tag = 1;
-        self.navigationItem.leftBarButtonItem = respringButton;
-        self.navigationItem.rightBarButtonItem = cancelButton;
+        [[self navigationItem] setLeftBarButtonItem:respringButton];
+        [[self navigationItem] setRightBarButtonItem:cancelButton];
         [respringButton release];
         [cancelButton release];
     } else {

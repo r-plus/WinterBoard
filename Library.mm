@@ -143,6 +143,8 @@ Class $SBStatusBarTimeView;
 Class $SBUIController;
 Class $SBWidgetApplicationIcon;
 
+static bool IsWild_;
+
 @interface NSDictionary (WinterBoard)
 - (UIColor *) wb$colorForKey:(NSString *)key;
 - (BOOL) wb$boolForKey:(NSString *)key;
@@ -464,6 +466,15 @@ MSHook(UIImage *, SBApplicationIcon$icon, SBApplicationIcon *self, SEL sel) {
     return _SBApplicationIcon$icon(self, sel);
 }
 
+MSHook(UIImage *, SBApplicationIcon$generateIconImage$, SBApplicationIcon *self, SEL sel, int type) {
+    if (type == 2)
+        if (![Info_ wb$boolForKey:@"ComposeStoreIcons"])
+            if (NSString *path = $pathForIcon$([self application]))
+                if (UIImage *image = [UIImage imageWithContentsOfFile:path])
+                    return [image _imageScaledToProportion:1.2 interpolationQuality:5];
+    return _SBApplicationIcon$generateIconImage$(self, sel, type);
+}
+
 MSHook(UIImage *, SBWidgetApplicationIcon$icon, SBWidgetApplicationIcon *self, SEL sel) {
     if (Debug_)
         NSLog(@"WB:Debug:Widget(%@:%@)", [self displayIdentifier], [self displayName]);
@@ -592,15 +603,12 @@ MSHook(void, SBCalendarIconContentsView$drawRect$, SBCalendarIconContentsView *s
 
     CFRelease(formatter);
 
-    UIDevice *device([UIDevice currentDevice]);
-    bool isWild([device respondsToSelector:@selector(isWildcat)] && [device isWildcat]);
-
     NSString *datestyle([@""
         "font-family: Helvetica; "
         "font-weight: bold; "
         "color: #333333; "
         "alpha: 1.0; "
-    "" stringByAppendingString:(isWild
+    "" stringByAppendingString:(IsWild_
         ? @"font-size: 54px; "
         : @"font-size: 39px; "
     )]);
@@ -610,7 +618,7 @@ MSHook(void, SBCalendarIconContentsView$drawRect$, SBCalendarIconContentsView *s
         "font-weight: bold; "
         "color: white; "
         "text-shadow: rgba(0, 0, 0, 0.2) -1px -1px 2px; "
-    "" stringByAppendingString:(isWild
+    "" stringByAppendingString:(IsWild_
         ? @"font-size: 11px; "
         : @"font-size: 9px; "
     )]);
@@ -625,7 +633,7 @@ MSHook(void, SBCalendarIconContentsView$drawRect$, SBCalendarIconContentsView *s
     CGSize datesize = [(NSString *)date sizeWithStyle:datestyle forWidth:(width + leeway)];
     CGSize daysize = [(NSString *)day sizeWithStyle:daystyle forWidth:(width + leeway)];
 
-    unsigned base(isWild ? 89 : 70);
+    unsigned base(IsWild_ ? 89 : 70);
     if ($GSFontGetUseLegacyFontMetrics())
         base = base + 1;
 
@@ -634,7 +642,7 @@ MSHook(void, SBCalendarIconContentsView$drawRect$, SBCalendarIconContentsView *s
     ) withStyle:datestyle];
 
     [(NSString *)day drawAtPoint:CGPointMake(
-        (width + 1 - daysize.width) / 2, ((isWild ? 18 : 16) - daysize.height) / 2
+        (width + 1 - daysize.width) / 2, ((IsWild_ ? 18 : 16) - daysize.height) / 2
     ) withStyle:daystyle];
 
     CFRelease(date);
@@ -698,6 +706,7 @@ MSHook(UIImage *, UIImage$defaultDesktopImage, UIImage *self, SEL sel) {
 }
 
 static NSArray *Wallpapers_;
+static bool Papered_;
 static NSString *WallpaperFile_;
 static UIImageView *WallpaperImage_;
 static UIWebDocumentView *WallpaperPage_;
@@ -714,6 +723,15 @@ MSHook(id, SBUIController$init, SBUIController *self, SEL sel) {
     if (self == nil)
         return nil;
 
+    if (Papered_) {
+        UIWindow *&_wallpaperView(MSHookIvar<UIWindow *>(self, "_wallpaperView"));
+        if (&_wallpaperView != NULL) {
+            [_wallpaperView removeFromSuperview];
+            [_wallpaperView release];
+            _wallpaperView = nil;
+        }
+    }
+
     UIWindow *&_window(MSHookIvar<UIWindow *>(self, "_window"));
     UIView *&_contentLayer(MSHookIvar<UIView *>(self, "_contentLayer"));
     UIView *&_contentView(MSHookIvar<UIView *>(self, "_contentView"));
@@ -727,10 +745,21 @@ MSHook(id, SBUIController$init, SBUIController *self, SEL sel) {
         layer = nil;
 
     UIView *content([[[UIView alloc] initWithFrame:[layer frame]] autorelease]);
+
     [content setBackgroundColor:[layer backgroundColor]];
     [layer setBackgroundColor:[UIColor clearColor]];
     [layer setFrame:[content bounds]];
     [_window setContentView:content];
+
+    UIView *indirect;
+    if (!SummerBoard_ || !IsWild_)
+        indirect = content;
+    else {
+        CGRect bounds([content bounds]);
+        indirect = [[[UIView alloc] initWithFrame:bounds] autorelease];
+        [content addSubview:indirect];
+        [indirect zoomToScale:2.4];
+    }
 
     _release(WallpaperFile_);
     _release(WallpaperImage_);
@@ -751,7 +780,7 @@ MSHook(id, SBUIController$init, SBUIController *self, SEL sel) {
 
             AVQueue *queue([controller_ queue]);
 
-            UIView *video([[[UIView alloc] initWithFrame:[content bounds]] autorelease]);
+            UIView *video([[[UIView alloc] initWithFrame:[indirect bounds]] autorelease]);
             [controller_ setLayer:[video _layer]];
 
             AVItem *item([[[AVItem alloc] initWithPath:mp4 error:&error] autorelease]);
@@ -764,14 +793,14 @@ MSHook(id, SBUIController$init, SBUIController *self, SEL sel) {
 	    controller.movieControlMode = MPMovieControlModeHidden;
 	    [controller play];
 #else
-            MPVideoView *video = [[[$MPVideoView alloc] initWithFrame:[content bounds]] autorelease];
+            MPVideoView *video = [[[$MPVideoView alloc] initWithFrame:[indirect bounds]] autorelease];
             [video setMovieWithPath:mp4];
             [video setRepeatMode:1];
             [video setRepeatGap:-1];
             [video playFromBeginning];;
 #endif
 
-            [content addSubview:video];
+            [indirect addSubview:video];
         }
 
         NSString *png = [theme stringByAppendingPathComponent:@"Wallpaper.png"];
@@ -796,12 +825,12 @@ MSHook(id, SBUIController$init, SBUIController *self, SEL sel) {
             WallpaperImage_ = [[UIImageView alloc] initWithImage:image];
             if (NSNumber *number = [Info_ objectForKey:@"WallpaperAlpha"])
                 [WallpaperImage_ setAlpha:[number floatValue]];
-            [content addSubview:WallpaperImage_];
+            [indirect addSubview:WallpaperImage_];
         }
 
         NSString *html = [theme stringByAppendingPathComponent:@"Wallpaper.html"];
         if ([Manager_ fileExistsAtPath:html]) {
-            CGRect bounds = [content bounds];
+            CGRect bounds = [indirect bounds];
 
             UIWebDocumentView *view([[[UIWebDocumentView alloc] initWithFrame:bounds] autorelease]);
             [view setAutoresizes:true];
@@ -816,7 +845,7 @@ MSHook(id, SBUIController$init, SBUIController *self, SEL sel) {
                 [view setDrawsBackground:NO];
             [[view webView] setDrawsBackground:NO];
 
-            [content addSubview:view];
+            [indirect addSubview:view];
         }
     }
 
@@ -824,7 +853,7 @@ MSHook(id, SBUIController$init, SBUIController *self, SEL sel) {
         NSString *theme = [themes_ objectAtIndex:(e - i - 1)];
         NSString *html = [theme stringByAppendingPathComponent:@"Widget.html"];
         if ([Manager_ fileExistsAtPath:html]) {
-            CGRect bounds = [content bounds];
+            CGRect bounds = [indirect bounds];
 
             UIWebDocumentView *view([[[UIWebDocumentView alloc] initWithFrame:bounds] autorelease]);
             [view setAutoresizes:true];
@@ -837,7 +866,7 @@ MSHook(id, SBUIController$init, SBUIController *self, SEL sel) {
                 [view setDrawsBackground:NO];
             [[view webView] setDrawsBackground:NO];
 
-            [content addSubview:view];
+            [indirect addSubview:view];
         }
     }
 
@@ -1192,19 +1221,16 @@ MSHook(void, SBIconLabel$drawRect$, SBIconLabel *self, SEL sel, CGRect rect) {
 
     NSString *label(MSHookIvar<NSString *>(self, "_label"));
 
-    UIDevice *device([UIDevice currentDevice]);
-    bool isWild([device respondsToSelector:@selector(isWildcat)] && [device isWildcat]);
-
     NSString *style = [NSString stringWithFormat:@""
         "font-family: Helvetica; "
         "font-weight: bold; "
         "color: %@; %@"
-    "", (docked || !SummerBoard_ ? @"white" : @"#b3b3b3"), (isWild
+    "", (docked || !SummerBoard_ ? @"white" : @"#b3b3b3"), (IsWild_
         ? @"font-size: 12px; "
         : @"font-size: 11px; "
     )];
 
-    if (isWild)
+    if (IsWild_)
         style = [style stringByAppendingString:@"text-shadow: rgba(0, 0, 0, 0.5) 0px 1px 0px; "];
     else if (docked)
         style = [style stringByAppendingString:@"text-shadow: rgba(0, 0, 0, 0.5) 0px -1px 0px; "];
@@ -1601,6 +1627,7 @@ extern "C" void WBInitialize() {
         if (SummerBoard_) {
             WBRename(SBApplication, pathForIcon, pathForIcon);
             WBRename(SBApplicationIcon, icon, icon);
+            WBRename(SBApplicationIcon, generateIconImage:, generateIconImage$);
         }
 
         WBRename(SBBookmarkIcon, icon, icon);
@@ -1646,10 +1673,14 @@ extern "C" void WBInitialize() {
     }
 
     Wallpapers_ = [[NSArray arrayWithObjects:@"Wallpaper.mp4", @"Wallpaper.png", @"Wallpaper.jpg", @"Wallpaper.html", nil] retain];
+    Papered_ = $getTheme$(Wallpapers_) != nil;
+
+    UIDevice *device([UIDevice currentDevice]);
+    IsWild_ = [device respondsToSelector:@selector(isWildcat)] && [device isWildcat];
 
     if ([Info_ objectForKey:@"UndockedIconLabels"] == nil)
         [Info_ setObject:[NSNumber numberWithBool:(
-            $getTheme$(Wallpapers_) == nil ||
+            Papered_ ||
             [Info_ objectForKey:@"DockedIconLabelStyle"] != nil ||
             [Info_ objectForKey:@"UndockedIconLabelStyle"] != nil
         )] forKey:@"UndockedIconLabels"];

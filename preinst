@@ -31,6 +31,7 @@ if [[ $1 == install || $1 == upgrade ]]; then
         cat <<EOF
 reserve com.saurik.winterboard. 0 0 rwr-r-
 monitor com.saurik.winterboard.lockbackground /var/mobile/Library/LockBackground.jpg
+monitor com.saurik.winterboard.lockbackground /var/mobile/Library/HomeBackground.jpg
 EOF
     } >/etc/notify.conf_ &&
         chmod --reference=/etc/notify.conf /etc/notify.conf_ &&

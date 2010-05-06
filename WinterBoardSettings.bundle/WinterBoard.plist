@@ -50,8 +50,7 @@
 			<key>cell</key>
 			<string>PSGroupCell</string>
 			<key>footerText</key>
-			<string>Most themes are ancient/slow, designed
-for SummerBoard, not WinterBoard.</string>
+			<string>Most themes are ancient/slow, designed for SummerBoard, not WinterBoard.</string>
 		</dict>
 		<dict>
 			<key>cell</key>
@@ -90,8 +89,7 @@ for SummerBoard, not WinterBoard.</string>
 			<key>cell</key>
 			<string>PSTitleValueCell</string>
 			<key>label</key>
-			<string>Most themes are ancient/slow, designed
-for SummerBoard, not WinterBoard.</string>
+			<string>Most themes are ancient/slow, designed for SummerBoard, not WinterBoard.</string>
 			<key>requiredCapabilities</key>
 			<array>
 				<dict>
