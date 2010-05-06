@@ -756,6 +756,7 @@ MSHook(id, SBUIController$init, SBUIController *self, SEL sel) {
         indirect = content;
     else {
         CGRect bounds([content bounds]);
+        bounds.origin.y = -30;
         indirect = [[[UIView alloc] initWithFrame:bounds] autorelease];
         [content addSubview:indirect];
         [indirect zoomToScale:2.4];
