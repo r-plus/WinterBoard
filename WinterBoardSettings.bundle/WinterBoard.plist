@@ -1,53 +1,161 @@
-{
-    items = ({
-        cell = PSSwitchCell;
-        key = IconHidden;
-        default = 0;
-        label = "Hide WinterBoard";
-    }, {
-        cell = PSGroupCell;
-	isStaticText = true;
-    }, {
-        cell = PSTitleValueCell;
-        label = "WinterBoard can also be found under the normal iPhone OS Settings application.";
-    }, {
-        cell = PSGroupCell;
-    }, {
-        cell = PSSwitchCell;
-        key = Debug;
-        default = 0;
-        label = "Debug Logging";
-    }, {
-        cell = PSSwitchCell;
-        key = SummerBoard;
-        default = 1;
-        label = "SummerBoard Mode";
-    }, {
-        cell = PSGroupCell;
-	isStaticText = true;
-    }, {
-        cell = PSTitleValueCell;
-        label = "Most themes are ancient/slow, designed\nfor SummerBoard, not WinterBoard.";
-    }, {
-        cell = PSGroupCell;
-    }, {
-        cell = PSLinkCell;
-        detail = WBSThemesController;
-        icon = Themes.png;
-        label = "Select Themes";
-    }, {
-        cell = PSGroupCell;
-    }, {
-        cell = PSButtonCell;
-        action = optimizeThemes;
-        label = "Optimize Themes (v1.0)";
-    }, {
-        cell = PSGroupCell;
-	isStaticText = true;
-    }, {
-        cell = PSTitleValueCell;
-        label = "iPhone-optimize PNGs (for speed).";
-    });
-
-    title = WinterBoard;
-}
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>items</key>
+	<array>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>footerText</key>
+			<string>WinterBoard can also be found under the normal iPhone OS Settings application.</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<false/>
+			<key>key</key>
+			<string>IconHidden</string>
+			<key>label</key>
+			<string>Hide WinterBoard</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>isStaticText</key>
+			<string>true</string>
+			<key>requiredCapabilities</key>
+			<array>
+				<dict>
+					<key>wildcat</key>
+					<false/>
+				</dict>
+			</array>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSTitleValueCell</string>
+			<key>label</key>
+			<string>WinterBoard can also be found under the normal iPhone OS Settings application.</string>
+			<key>requiredCapabilities</key>
+			<array>
+				<dict>
+					<key>wildcat</key>
+					<false/>
+				</dict>
+			</array>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>footerText</key>
+			<string>Most themes are ancient/slow, designed
+for SummerBoard, not WinterBoard.</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<false/>
+			<key>key</key>
+			<string>Debug</string>
+			<key>label</key>
+			<string>Debug Logging</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<true/>
+			<key>key</key>
+			<string>SummerBoard</string>
+			<key>label</key>
+			<string>SummerBoard Mode</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>isStaticText</key>
+			<string>true</string>
+			<key>requiredCapabilities</key>
+			<array>
+				<dict>
+					<key>wildcat</key>
+					<false/>
+				</dict>
+			</array>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSTitleValueCell</string>
+			<key>label</key>
+			<string>Most themes are ancient/slow, designed
+for SummerBoard, not WinterBoard.</string>
+			<key>requiredCapabilities</key>
+			<array>
+				<dict>
+					<key>wildcat</key>
+					<false/>
+				</dict>
+			</array>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSLinkCell</string>
+			<key>detail</key>
+			<string>WBSThemesController</string>
+			<key>icon</key>
+			<string>Themes.png</string>
+			<key>label</key>
+			<string>Select Themes</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>footerText</key>
+			<string>iPhone-optimize PNGs (for speed).</string>
+		</dict>
+		<dict>
+			<key>action</key>
+			<string>optimizeThemes</string>
+			<key>cell</key>
+			<string>PSButtonCell</string>
+			<key>label</key>
+			<string>Optimize Themes (v1.0)</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>isStaticText</key>
+			<string>true</string>
+			<key>requiredCapabilities</key>
+			<array>
+				<dict>
+					<key>wildcat</key>
+					<false/>
+				</dict>
+			</array>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSTitleValueCell</string>
+			<key>label</key>
+			<string>iPhone-optimize PNGs (for speed).</string>
+			<key>requiredCapabilities</key>
+			<array>
+				<dict>
+					<key>wildcat</key>
+					<false/>
+				</dict>
+			</array>
+		</dict>
+	</array>
+	<key>title</key>
+	<string>WinterBoard</string>
+</dict>
+</plist>
