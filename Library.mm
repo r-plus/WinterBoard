@@ -1233,7 +1233,7 @@ MSHook(void, SBIconLabel$drawRect$, SBIconLabel *self, SEL sel, CGRect rect) {
 
     static Ivar drawMoreLegibly = object_getInstanceVariable(self, "_drawMoreLegibly", NULL);
 
-    BOOL docked;
+    int docked;
     Ivar ivar = object_getInstanceVariable(self, "_inDock", reinterpret_cast<void **>(&docked));
     docked = (docked & (ivar_getOffset(ivar) == ivar_getOffset(drawMoreLegibly) ? 0x2 : 0x1)) != 0;
 
@@ -1702,7 +1702,7 @@ extern "C" void WBInitialize() {
 
     if ([Info_ objectForKey:@"UndockedIconLabels"] == nil)
         [Info_ setObject:[NSNumber numberWithBool:(
-            Papered_ ||
+            !Papered_ ||
             [Info_ objectForKey:@"DockedIconLabelStyle"] != nil ||
             [Info_ objectForKey:@"UndockedIconLabelStyle"] != nil
         )] forKey:@"UndockedIconLabels"];

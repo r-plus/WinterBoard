@@ -3,7 +3,7 @@ Priority: optional
 Section: System
 Maintainer: Jay Freeman (saurik) <saurik@saurik.com>
 Architecture: iphoneos-arm
-Version: 0.9.3185-1
+Version: 0.9.3186-1
 Description: more powerful, open-source SummerBoard
 Name: WinterBoard
 Depends: mobilesubstrate (>= 0.9.2958-1), killall, preferenceloader, libhide (>= 2.0.4), findutils, net.howett.pincrush (>= 0.0.1-23) | pincrush
