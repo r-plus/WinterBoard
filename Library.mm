@@ -740,6 +740,9 @@ MSHook(id, SBUIController$init, SBUIController *self, SEL sel) {
     if (self == nil)
         return nil;
 
+    UIDevice *device([UIDevice currentDevice]);
+    IsWild_ = [device respondsToSelector:@selector(isWildcat)] && [device isWildcat];
+
     if (Papered_) {
         UIWindow *&_wallpaperView(MSHookIvar<UIWindow *>(self, "_wallpaperView"));
         if (&_wallpaperView != NULL) {
@@ -1696,9 +1699,6 @@ extern "C" void WBInitialize() {
 
     Wallpapers_ = [[NSArray arrayWithObjects:@"Wallpaper.mp4", @"Wallpaper.png", @"Wallpaper.jpg", @"Wallpaper.html", nil] retain];
     Papered_ = $getTheme$(Wallpapers_) != nil;
-
-    UIDevice *device([UIDevice currentDevice]);
-    IsWild_ = [device respondsToSelector:@selector(isWildcat)] && [device isWildcat];
 
     if ([Info_ objectForKey:@"UndockedIconLabels"] == nil)
         [Info_ setObject:[NSNumber numberWithBool:(
