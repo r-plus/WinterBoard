@@ -256,7 +256,7 @@ static NSString *$pathForFile$inBundle$(NSString *file, NSBundle *bundle, bool u
     return nil;
 }
 
-static NSString *$pathForIcon$(SBApplication *self) {
+static NSString *$pathForIcon$(SBApplication *self, NSString *suffix = @"") {
     NSString *identifier = [self bundleIdentifier];
     NSString *path = [self path];
     NSString *folder = [path lastPathComponent];
@@ -276,7 +276,7 @@ static NSString *$pathForIcon$(SBApplication *self) {
 
     #define testForIcon(Name) \
         if (NSString *name = Name) \
-            [names addObject:[NSString stringWithFormat:@"Icons/%@.png", name]];
+            [names addObject:[NSString stringWithFormat:@"Icons%@/%@.png", suffix, name]];
 
     if (![didentifier isEqualToString:identifier])
         testForIcon(didentifier);
@@ -472,10 +472,13 @@ MSHook(UIImage *, SBApplicationIcon$icon, SBApplicationIcon *self, SEL sel) {
 
 MSHook(UIImage *, SBApplicationIcon$generateIconImage$, SBApplicationIcon *self, SEL sel, int type) {
     if (type == 2)
-        if (![Info_ wb$boolForKey:@"ComposeStoreIcons"])
-            if (NSString *path = $pathForIcon$([self application]))
+        if (![Info_ wb$boolForKey:@"ComposeStoreIcons"]) {
+            if (NSString *path72 = $pathForIcon$([self application], @"-72"))
+                return [UIImage imageWithContentsOfFile:path];
+            else if (NSString *path = $pathForIcon$([self application]))
                 if (UIImage *image = [UIImage imageWithContentsOfFile:path])
                     return [image _imageScaledToProportion:1.2 interpolationQuality:5];
+        }
     return _SBApplicationIcon$generateIconImage$(self, sel, type);
 }
 
