@@ -441,8 +441,9 @@ static NSString *_plist;
 
     system("rm -rf /User/Library/Caches/SpringBoardIconCache");
     system("rm -rf /User/Library/Caches/SpringBoardIconCache-small");
+    system("rm -rf /User/Library/Caches/com.apple.IconsCache");
 
-    system("killall SpringBoard");
+    system("killall lsd SpringBoard");
 }
 
 - (void) cancelChanges {

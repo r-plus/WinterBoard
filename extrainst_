@@ -1,0 +1,4 @@
+#!/bin/bash
+if [[ $1 == install || $1 == upgrade ]]; then
+    launchctl stop com.apple.lsd || true
+fi

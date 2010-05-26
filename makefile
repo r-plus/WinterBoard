@@ -16,7 +16,7 @@ WinterBoardSettings: Settings.mm makefile
 	ldid -S $@
 
 WinterBoard.dylib: Library.mm makefile ../mobilesubstrate/substrate.h
-	$(target)g++ -dynamiclib -g0 -O2 -Wall -o $@ $(filter %.mm,$^) -framework CoreFoundation -framework Foundation -lobjc -init _WBInitialize -I/apl/inc/iPhoneOS-2.0 -framework CoreGraphics -framework GraphicsServices -framework Celestial $(substrate) -framework UIKit -F$(PKG_ROOT)/System/Library/PrivateFrameworks
+	$(target)g++ -dynamiclib -g0 -O2 -Wall -o $@ $(filter %.mm,$^) -framework CoreFoundation -framework Foundation -lobjc -init _WBInitialize -I/apl/inc/iPhoneOS-2.0 -framework CoreGraphics -framework ImageIO -framework GraphicsServices -framework Celestial $(substrate) -framework UIKit -F$(PKG_ROOT)/System/Library/PrivateFrameworks
 	ldid -S $@
 
 UIImages: UIImages.mm makefile
@@ -50,7 +50,7 @@ package: all
 	cp -a WinterBoard.plist winterboard/Library/MobileSubstrate/DynamicLibraries
 	cp -a *.theme winterboard/Library/Themes
 	find winterboard -name .svn | while read -r line; do rm -rf "$${line}"; done
-	cp -a control preinst prerm winterboard/DEBIAN
+	cp -a control extrainst_ preinst prerm winterboard/DEBIAN
 	cp -a Test.sh Icon-Small.png icon.png WinterBoard.dylib WinterBoard UIImages Info.plist winterboard/Applications/WinterBoard.app
 	dpkg-deb -b winterboard winterboard_$(shell grep ^Version: control | cut -d ' ' -f 2)_iphoneos-arm.deb
 

@@ -60,6 +60,7 @@ bool _itv;
 #import <CoreFoundation/CoreFoundation.h>
 #import <Foundation/Foundation.h>
 #import <CoreGraphics/CoreGraphics.h>
+#import <ImageIO/CGImageSource.h>
 
 #import <Celestial/AVController.h>
 #import <Celestial/AVItem.h>
@@ -474,7 +475,7 @@ MSHook(UIImage *, SBApplicationIcon$generateIconImage$, SBApplicationIcon *self,
     if (type == 2)
         if (![Info_ wb$boolForKey:@"ComposeStoreIcons"]) {
             if (NSString *path72 = $pathForIcon$([self application], @"-72"))
-                return [UIImage imageWithContentsOfFile:path];
+                return [UIImage imageWithContentsOfFile:path72];
             else if (NSString *path = $pathForIcon$([self application]))
                 if (UIImage *image = [UIImage imageWithContentsOfFile:path])
                     return [image _imageScaledToProportion:1.2 interpolationQuality:5];
@@ -514,6 +515,19 @@ static UIImage *CachedImageAtPath(NSString *path) {
         image = [image autorelease];
     [PathImages_ setObject:(image == nil ? [NSNull null] : reinterpret_cast<id>(image)) forKey:path];
     return image;
+}
+
+MSHook(CGImageSourceRef, CGImageSourceCreateWithURL, CFURLRef url, CFDictionaryRef options) {
+    if (Debug_)
+        NSLog(@"WB:Debug: CGImageSourceCreateWithURL(\"%@\", %s)", url, options);
+    NSAutoreleasePool *pool([[NSAutoreleasePool alloc] init]);
+    if (NSString *path = (NSString *) CFURLCopyFileSystemPath(url, kCFURLPOSIXPathStyle))
+        if (NSString *themed = [path wb$themedPath])
+            if (themed != path)
+                url = (CFURLRef) [NSURL fileURLWithPath:themed];
+    CGImageSourceRef source(_CGImageSourceCreateWithURL(url, options));
+    [pool release];
+    return source;
 }
 
 MSHook(CGImageRef, _UIImageRefAtPath, NSString *name, bool cache, UIImageOrientation *orientation) {
@@ -1462,6 +1476,16 @@ static void dlset(Type_ &function, const char *name) {
     function = reinterpret_cast<Type_>(dlsym(RTLD_DEFAULT, name));
 }
 
+/*static void WBImage(const struct mach_header* mh, intptr_t vmaddr_slide) {
+    uint32_t count(_dyld_image_count());
+    for (uint32_t index(0); index != count; ++index)
+        if (_dyld_get_image_header(index) == mh) {
+            CGImageSourceRef (*CGImageSourceCreateWithURL)(CFURLRef url, CFDictionaryRef options);
+            dlset(CGImageSourceCreateWithURL, "CGImageSourceCreateWithURL");
+            MSHookFunction(&CGImageSourceCreateWithURL, &$CGImageSourceCreateWithURL, &_CGImageSourceCreateWithURL);
+        }
+}*/
+
 extern "C" void WBInitialize() {
     NSAutoreleasePool *pool([[NSAutoreleasePool alloc] init]);
 
@@ -1471,40 +1495,51 @@ extern "C" void WBInitialize() {
 
     dlset(_GSFontGetUseLegacyFontMetrics, "GSFontGetUseLegacyFontMetrics");
 
+    //if ([NSBundle bundleWithIdentifier:@"com.apple.ImageIO.framework"] != nil)
+        MSHookFunction(&CGImageSourceCreateWithURL, &$CGImageSourceCreateWithURL, &_CGImageSourceCreateWithURL);
+    //else
+    //    _dyld_register_func_for_add_image(&WBImage);
+
     struct nlist nl[8];
 
-    memset(nl, 0, sizeof(nl));
-    nl[0].n_un.n_name = (char *) "__UIApplicationImageWithName";
-    nl[1].n_un.n_name = (char *) "__UIImageAtPath";
-    nl[2].n_un.n_name = (char *) "__UIImageRefAtPath";
-    nl[3].n_un.n_name = (char *) "__UIImageWithNameInDomain";
-    nl[4].n_un.n_name = (char *) "__UIKitBundle";
-    nl[5].n_un.n_name = (char *) "__UISharedImageNameGetIdentifier";
-    nl[6].n_un.n_name = (char *) "__UISharedImageWithIdentifier";
-    nlist(UIKit, nl);
+    if ([NSBundle bundleWithIdentifier:@"com.apple.UIKit"] != nil) {
+// UIKit {{{
+        memset(nl, 0, sizeof(nl));
+        nl[0].n_un.n_name = (char *) "__UIApplicationImageWithName";
+        nl[1].n_un.n_name = (char *) "__UIImageAtPath";
+        nl[2].n_un.n_name = (char *) "__UIImageRefAtPath";
+        nl[3].n_un.n_name = (char *) "__UIImageWithNameInDomain";
+        nl[4].n_un.n_name = (char *) "__UIKitBundle";
+        nl[5].n_un.n_name = (char *) "__UISharedImageNameGetIdentifier";
+        nl[6].n_un.n_name = (char *) "__UISharedImageWithIdentifier";
+        nlist(UIKit, nl);
 
-    nlset(_UIApplicationImageWithName, nl, 0);
-    nlset(_UIImageAtPath, nl, 1);
-    nlset(_UIImageRefAtPath, nl, 2);
-    nlset(_UIImageWithNameInDomain, nl, 3);
-    nlset(_UIKitBundle, nl, 4);
-    nlset(_UISharedImageNameGetIdentifier, nl, 5);
-    nlset(_UISharedImageWithIdentifier, nl, 6);
+        nlset(_UIApplicationImageWithName, nl, 0);
+        nlset(_UIImageAtPath, nl, 1);
+        nlset(_UIImageRefAtPath, nl, 2);
+        nlset(_UIImageWithNameInDomain, nl, 3);
+        nlset(_UIKitBundle, nl, 4);
+        nlset(_UISharedImageNameGetIdentifier, nl, 5);
+        nlset(_UISharedImageWithIdentifier, nl, 6);
 
-    MSHookFunction(_UIApplicationImageWithName, &$_UIApplicationImageWithName, &__UIApplicationImageWithName);
-    MSHookFunction(_UIImageRefAtPath, &$_UIImageRefAtPath, &__UIImageRefAtPath);
-    MSHookFunction(_UIImageWithName, &$_UIImageWithName, &__UIImageWithName);
-    MSHookFunction(_UIImageWithNameInDomain, &$_UIImageWithNameInDomain, &__UIImageWithNameInDomain);
+        MSHookFunction(_UIApplicationImageWithName, &$_UIApplicationImageWithName, &__UIApplicationImageWithName);
+        MSHookFunction(_UIImageRefAtPath, &$_UIImageRefAtPath, &__UIImageRefAtPath);
+        MSHookFunction(_UIImageWithName, &$_UIImageWithName, &__UIImageWithName);
+        MSHookFunction(_UIImageWithNameInDomain, &$_UIImageWithNameInDomain, &__UIImageWithNameInDomain);
+// }}}
+    }
 
     MSHookFunction(&GSFontCreateWithName, &$GSFontCreateWithName, &_GSFontCreateWithName);
 
     if (dlopen(AudioToolbox, RTLD_LAZY | RTLD_NOLOAD) != NULL) {
+// AudioToolbox {{{
         struct nlist nl[2];
         memset(nl, 0, sizeof(nl));
         nl[0].n_un.n_name = (char *) "__Z24GetFileNameForThisActionmPcRb";
         nlist(AudioToolbox, nl);
         nlset(_Z24GetFileNameForThisActionmPcRb, nl, 0);
         MSHookFunction(_Z24GetFileNameForThisActionmPcRb, &$_Z24GetFileNameForThisActionmPcRb, &__Z24GetFileNameForThisActionmPcRb);
+// }}}
     }
 
     $NSBundle = objc_getClass("NSBundle");
@@ -1534,6 +1569,7 @@ extern "C" void WBInitialize() {
     themes_ = [[NSMutableArray alloc] initWithCapacity:8];
 
     if (NSDictionary *settings = [NSDictionary dictionaryWithContentsOfFile:[NSString stringWithFormat:@"/User/Library/Preferences/com.saurik.WinterBoard.plist"]]) {
+// Load Settings {{{
         if (NSNumber *value = [settings objectForKey:@"SummerBoard"])
             SummerBoard_ = [value boolValue];
         if (NSNumber *value = [settings objectForKey:@"Debug"])
@@ -1573,6 +1609,7 @@ extern "C" void WBInitialize() {
                 testForTheme(@"%@/Library/SummerBoard/Themes/%@", NSHomeDirectory(), name)
 
             }
+// }}}
     }
 
     Info_ = [[NSMutableDictionary dictionaryWithCapacity:16] retain];
@@ -1587,7 +1624,8 @@ extern "C" void WBInitialize() {
 
     SpringBoard_ = [identifier isEqualToString:@"com.apple.springboard"];
 
-    if ([NSBundle bundleWithIdentifier:@"com.apple.chatkit"])
+    if ([NSBundle bundleWithIdentifier:@"com.apple.chatkit"] != nil)
+// ChatKit {{{
         if (sms) {
             $CKMessageCell = objc_getClass("CKMessageCell");
             _CKMessageCell$addBalloonView$ = MSHookMessage($CKMessageCell, @selector(addBalloonView:), &$CKMessageCell$addBalloonView$);
@@ -1603,15 +1641,19 @@ extern "C" void WBInitialize() {
             $CKTranscriptController = objc_getClass("CKTranscriptController");
             _TranscriptController$loadView = MSHookMessage($CKTranscriptController, @selector(loadView), &$TranscriptController$loadView);
         }
+// }}}
 
     if ([identifier isEqualToString:@"com.apple.MobileSMS"]) {
+// MobileSMS {{{
         if (sms) {
             if (_TranscriptController$loadView == NULL) {
                 Class mSMSMessageTranscriptController = objc_getClass("mSMSMessageTranscriptController");
                 _TranscriptController$loadView = MSHookMessage(mSMSMessageTranscriptController, @selector(loadView), &$TranscriptController$loadView);
             }
         }
+// }}}
     } else if (SpringBoard_) {
+// SpringBoard {{{
         CFNotificationCenterAddObserver(
             CFNotificationCenterGetDarwinNotifyCenter(),
             NULL, &ChangeWallpaper, (CFStringRef) @"com.saurik.winterboard.lockbackground", NULL, 0
@@ -1698,6 +1740,7 @@ extern "C" void WBInitialize() {
             English_ = [[NSDictionary alloc] initWithContentsOfFile:@"/System/Library/CoreServices/SpringBoard.app/English.lproj/LocalizedApplicationNames.strings"];
 
         Cache_ = [[NSMutableDictionary alloc] initWithCapacity:64];
+// }}}
     }
 
     Wallpapers_ = [[NSArray arrayWithObjects:@"Wallpaper.mp4", @"Wallpaper.png", @"Wallpaper.jpg", @"Wallpaper.html", nil] retain];
