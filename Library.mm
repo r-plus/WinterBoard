@@ -128,6 +128,7 @@ Class $SBAwayView;
 Class $SBBookmarkIcon;
 Class $SBButtonBar;
 Class $SBCalendarIconContentsView;
+Class $SBDockIconListView;
 Class $SBIcon;
 Class $SBIconBadge;
 Class $SBIconController;
@@ -145,6 +146,7 @@ Class $SBUIController;
 Class $SBWidgetApplicationIcon;
 
 static bool IsWild_;
+static bool Four_;
 
 @interface NSDictionary (WinterBoard)
 - (UIColor *) wb$colorForKey:(NSString *)key;
@@ -180,11 +182,11 @@ static bool SpringBoard_;
 
 static UIImage *(*_UIApplicationImageWithName)(NSString *name);
 static UIImage *(*_UIImageAtPath)(NSString *name, NSBundle *path);
-static CGImageRef (*_UIImageRefAtPath)(NSString *name, bool cache, UIImageOrientation *orientation);
+static CGImageRef (*_UIImageRefAtPath)(NSString *name, bool cache, UIImageOrientation *orientation, float *scale);
 static UIImage *(*_UIImageWithNameInDomain)(NSString *name, NSString *domain);
 static NSBundle *(*_UIKitBundle)();
+static bool (*_UIPackedImageTableGetIdentifierForName)(NSString *, int *);
 static int (*_UISharedImageNameGetIdentifier)(NSString *);
-static UIImage *(*_UISharedImageWithIdentifier)(int);
 
 static NSMutableDictionary *UIImages_;
 static NSMutableDictionary *PathImages_;
@@ -236,7 +238,7 @@ static NSString *$pathForFile$inBundle$(NSString *file, NSBundle *bundle, bool u
         [names addObject:[NSString stringWithFormat:@"UIImages/%@", file]];
 
     #define remapResourceName(oldname, newname) \
-        else if ([file isEqualToString:oldname]) \
+        else if ([file isEqualToString:(oldname)]) \
             [names addObject:[NSString stringWithFormat:@"%@.png", newname]]; \
 
     bool summer(SpringBoard_ && SummerBoard_);
@@ -248,7 +250,7 @@ static NSString *$pathForFile$inBundle$(NSString *file, NSBundle *bundle, bool u
         [names addObject:[NSString stringWithFormat:@"Files/Applications/Calculator.app/%@", file]];
     else if (!summer);
         remapResourceName(@"FSO_BG.png", @"StatusBar")
-        remapResourceName(@"SBDockBG.png", @"Dock")
+        remapResourceName(Four_ ? @"SBDockBG-old.png" : @"SBDockBG.png", @"Dock")
         remapResourceName(@"SBWeatherCelsius.png", @"Icons/Weather")
 
     if (NSString *path = $getTheme$(names))
@@ -474,11 +476,18 @@ MSHook(UIImage *, SBApplicationIcon$icon, SBApplicationIcon *self, SEL sel) {
 MSHook(UIImage *, SBApplicationIcon$generateIconImage$, SBApplicationIcon *self, SEL sel, int type) {
     if (type == 2)
         if (![Info_ wb$boolForKey:@"ComposeStoreIcons"]) {
-            if (NSString *path72 = $pathForIcon$([self application], @"-72"))
-                return [UIImage imageWithContentsOfFile:path72];
-            else if (NSString *path = $pathForIcon$([self application]))
-                if (UIImage *image = [UIImage imageWithContentsOfFile:path])
-                    return [image _imageScaledToProportion:1.2 interpolationQuality:5];
+            if (IsWild_)
+                if (NSString *path72 = $pathForIcon$([self application], @"-72"))
+                    return [UIImage imageWithContentsOfFile:path72];
+            if (NSString *path = $pathForIcon$([self application]))
+                if (UIImage *image = [UIImage imageWithContentsOfFile:path]) {
+                    float width;
+                    if ([$SBIcon respondsToSelector:@selector(defaultIconImageSize)])
+                        width = [$SBIcon defaultIconImageSize].width;
+                    else
+                        width = 59;
+                    return width == 59 ? image : [image _imageScaledToProportion:(width / 59.0) interpolationQuality:5];
+                }
         }
     return _SBApplicationIcon$generateIconImage$(self, sel, type);
 }
@@ -530,9 +539,9 @@ MSHook(CGImageSourceRef, CGImageSourceCreateWithURL, CFURLRef url, CFDictionaryR
     return source;
 }
 
-MSHook(CGImageRef, _UIImageRefAtPath, NSString *name, bool cache, UIImageOrientation *orientation) {
+MSHook(CGImageRef, _UIImageRefAtPath, NSString *name, bool cache, UIImageOrientation *orientation, float *scale) {
     if (Debug_)
-        NSLog(@"WB:Debug: _UIImageRefAtPath(\"%@\", %s)", name, cache ? "true" : "false");
+        NSLog(@"WB:Debug: _UIImageRefAtPath(\"%@\")", name);
 
     NSString *themed([name wb$themedPath]);
 
@@ -546,7 +555,7 @@ MSHook(CGImageRef, _UIImageRefAtPath, NSString *name, bool cache, UIImageOrienta
             }
     }
 
-    return __UIImageRefAtPath(themed, cache, orientation);
+    return __UIImageRefAtPath(themed, cache, orientation, scale);
 }
 
 /*MSHook(UIImage *, _UIImageAtPath, NSString *name, NSBundle *bundle) {
@@ -628,7 +637,7 @@ MSHook(void, SBCalendarIconContentsView$drawRect$, SBCalendarIconContentsView *s
 
     CFDateRef now(CFDateCreate(NULL, CFAbsoluteTimeGetCurrent()));
 
-    CFDateFormatterSetFormat(formatter, (CFStringRef) [bundle localizedStringForKey:@"CALENDAR_ICON_DAY_NUMBER_FORMAT" value:@"" table:@"SpringBoard"]);
+    CFDateFormatterSetFormat(formatter, (CFStringRef) [bundle localizedStringForKey:@"CALENDAR_ICON_DAY_NUMBER_FORMAT" value:@"d" table:@"SpringBoard"]);
     CFStringRef date(CFDateFormatterCreateStringWithDate(NULL, formatter, now));
     CFDateFormatterSetFormat(formatter, (CFStringRef) [bundle localizedStringForKey:@"CALENDAR_ICON_DAY_NAME_FORMAT" value:@"cccc" table:@"SpringBoard"]);
     CFStringRef day(CFDateFormatterCreateStringWithDate(NULL, formatter, now));
@@ -667,16 +676,22 @@ MSHook(void, SBCalendarIconContentsView$drawRect$, SBCalendarIconContentsView *s
     CGSize datesize = [(NSString *)date sizeWithStyle:datestyle forWidth:(width + leeway)];
     CGSize daysize = [(NSString *)day sizeWithStyle:daystyle forWidth:(width + leeway)];
 
-    unsigned base(IsWild_ ? 89 : 70);
+    unsigned base0(IsWild_ ? 89 : 70);
     if ($GSFontGetUseLegacyFontMetrics())
-        base = base + 1;
+        base0 = base0 + 1;
+    unsigned base1(IsWild_ ? 18 : 16);
+
+    if (Four_) {
+        ++base0;
+        ++base1;
+    }
 
     [(NSString *)date drawAtPoint:CGPointMake(
-        (width + 1 - datesize.width) / 2, (base - datesize.height) / 2
+        (width + 1 - datesize.width) / 2, (base0 - datesize.height) / 2
     ) withStyle:datestyle];
 
     [(NSString *)day drawAtPoint:CGPointMake(
-        (width + 1 - daysize.width) / 2, ((IsWild_ ? 18 : 16) - daysize.height) / 2
+        (width + 1 - daysize.width) / 2, (base1 - daysize.height) / 2
     ) withStyle:daystyle];
 
     CFRelease(date);
@@ -741,6 +756,7 @@ MSHook(UIImage *, UIImage$defaultDesktopImage, UIImage *self, SEL sel) {
 
 static NSArray *Wallpapers_;
 static bool Papered_;
+static bool Docked_;
 static NSString *WallpaperFile_;
 static UIImageView *WallpaperImage_;
 static UIWebDocumentView *WallpaperPage_;
@@ -773,15 +789,20 @@ MSHook(id, SBUIController$init, SBUIController *self, SEL sel) {
     UIView *&_contentLayer(MSHookIvar<UIView *>(self, "_contentLayer"));
     UIView *&_contentView(MSHookIvar<UIView *>(self, "_contentView"));
 
-    UIView *layer;
+    UIView **player;
     if (&_contentLayer != NULL)
-        layer = _contentLayer;
+        player = &_contentLayer;
     else if (&_contentView != NULL)
-        layer = _contentView;
+        player = &_contentView;
     else
-        layer = nil;
+        player = NULL;
+
+    UIView *layer(player == NULL ? nil : *player);
 
     UIView *content([[[UIView alloc] initWithFrame:[layer frame]] autorelease]);
+
+    /*if (player != NULL)
+        *player = content;*/
 
     [content setBackgroundColor:[layer backgroundColor]];
     [layer setBackgroundColor:[UIColor clearColor]];
@@ -1213,6 +1234,14 @@ MSHook(void, SBIconLabel$setInDock$, SBIconLabel *self, SEL sel, BOOL docked) {
     return _SBIconLabel$setInDock$(self, sel, docked);
 }
 
+MSHook(BOOL, SBDockIconListView$shouldShowNewDock, id self, SEL sel) {
+    return SummerBoard_ && Docked_ ? NO : _SBDockIconListView$shouldShowNewDock(self, sel);
+}
+
+MSHook(void, SBDockIconListView$setFrame$, id self, SEL sel, CGRect frame) {
+    _SBDockIconListView$setFrame$(self, sel, frame);
+}
+
 MSHook(NSString *, NSBundle$localizedStringForKey$value$table$, NSBundle *self, SEL sel, NSString *key, NSString *value, NSString *table) {
     NSString *identifier = [self bundleIdentifier];
     NSLocale *locale = [NSLocale currentLocale];
@@ -1360,24 +1389,39 @@ MSHook(void, TranscriptController$loadView, mSMSMessageTranscriptController *sel
 }
 
 MSHook(UIImage *, _UIImageWithName, NSString *name) {
-    int id(_UISharedImageNameGetIdentifier(name));
     if (Debug_)
-        NSLog(@"WB:Debug: _UIImageWithName(\"%@\": %d)", name, id);
+        NSLog(@"WB:Debug: _UIImageWithName(\"%@\")", name);
 
-    if (id == -1)
-        return _UIImageAtPath(name, _UIKitBundle());
+    int identifier;
+    bool packed;
+
+    if (_UIPackedImageTableGetIdentifierForName != NULL)
+        packed = _UIPackedImageTableGetIdentifierForName(name, &identifier);
+    else if (_UISharedImageNameGetIdentifier != NULL) {
+        identifier = _UISharedImageNameGetIdentifier(name);
+        packed = identifier != -1;
+    } else {
+        identifier = -1;
+        packed = false;
+    }
+
+    if (Debug_)
+        NSLog(@"WB:Debug: _UISharedImageNameGetIdentifier(\"%@\") = %d", name, identifier);
+
+    if (!packed)
+        return __UIImageWithName(name);
     else {
-        NSNumber *key([NSNumber numberWithInt:id]);
-        UIImage *image = [UIImages_ objectForKey:key];
+        NSNumber *key([NSNumber numberWithInt:identifier]);
+        UIImage *image([UIImages_ objectForKey:key]);
         if (image != nil)
-            return reinterpret_cast<id>(image) == [NSNull null] ? _UISharedImageWithIdentifier(id) : image;
+            return reinterpret_cast<id>(image) == [NSNull null] ? __UIImageWithName(name) : image;
         if (NSString *path = $pathForFile$inBundle$(name, _UIKitBundle(), true)) {
             image = [[UIImage alloc] initWithContentsOfFile:path cache:true];
             if (image != nil)
                 [image autorelease];
         }
         [UIImages_ setObject:(image == nil ? [NSNull null] : reinterpret_cast<id>(image)) forKey:key];
-        return image == nil ? _UISharedImageWithIdentifier(id) : image;
+        return image == nil ? __UIImageWithName(name) : image;
     }
 }
 
@@ -1510,8 +1554,8 @@ extern "C" void WBInitialize() {
         nl[2].n_un.n_name = (char *) "__UIImageRefAtPath";
         nl[3].n_un.n_name = (char *) "__UIImageWithNameInDomain";
         nl[4].n_un.n_name = (char *) "__UIKitBundle";
-        nl[5].n_un.n_name = (char *) "__UISharedImageNameGetIdentifier";
-        nl[6].n_un.n_name = (char *) "__UISharedImageWithIdentifier";
+        nl[5].n_un.n_name = (char *) "__UIPackedImageTableGetIdentifierForName";
+        nl[6].n_un.n_name = (char *) "__UISharedImageNameGetIdentifier";
         nlist(UIKit, nl);
 
         nlset(_UIApplicationImageWithName, nl, 0);
@@ -1519,8 +1563,8 @@ extern "C" void WBInitialize() {
         nlset(_UIImageRefAtPath, nl, 2);
         nlset(_UIImageWithNameInDomain, nl, 3);
         nlset(_UIKitBundle, nl, 4);
-        nlset(_UISharedImageNameGetIdentifier, nl, 5);
-        nlset(_UISharedImageWithIdentifier, nl, 6);
+        nlset(_UIPackedImageTableGetIdentifierForName, nl, 5);
+        nlset(_UISharedImageNameGetIdentifier, nl, 6);
 
         MSHookFunction(_UIApplicationImageWithName, &$_UIApplicationImageWithName, &__UIApplicationImageWithName);
         MSHookFunction(_UIImageRefAtPath, &$_UIImageRefAtPath, &__UIImageRefAtPath);
@@ -1676,6 +1720,7 @@ extern "C" void WBInitialize() {
         $SBBookmarkIcon = objc_getClass("SBBookmarkIcon");
         $SBButtonBar = objc_getClass("SBButtonBar");
         $SBCalendarIconContentsView = objc_getClass("SBCalendarIconContentsView");
+        $SBDockIconListView = objc_getClass("SBDockIconListView");
         $SBIcon = objc_getClass("SBIcon");
         $SBIconBadge = objc_getClass("SBIconBadge");
         $SBIconController = objc_getClass("SBIconController");
@@ -1691,6 +1736,8 @@ extern "C" void WBInitialize() {
         $SBStatusBarTimeView = objc_getClass("SBStatusBarTimeView");
         $SBUIController = objc_getClass("SBUIController");
         $SBWidgetApplicationIcon = objc_getClass("SBWidgetApplicationIcon");
+
+        Four_ = $SBDockIconListView != nil;
 
         WBRename(WebCoreFrameBridge, renderedSizeOfNode:constrainedToWidth:, renderedSizeOfNode$constrainedToWidth$);
 
@@ -1708,6 +1755,9 @@ extern "C" void WBInitialize() {
         WBRename(SBIconController, noteNumberOfIconListsChanged, noteNumberOfIconListsChanged);
         WBRename(SBUIController, init, init);
         WBRename(SBWidgetApplicationIcon, icon, icon);
+
+        WBRename(SBDockIconListView, setFrame:, setFrame$);
+        MSHookMessage(object_getClass($SBDockIconListView), @selector(shouldShowNewDock), &$SBDockIconListView$shouldShowNewDock, &_SBDockIconListView$shouldShowNewDock);
 
         WBRename(SBIconLabel, drawRect:, drawRect$);
         WBRename(SBIconLabel, initWithSize:label:, initWithSize$label$);
@@ -1745,6 +1795,8 @@ extern "C" void WBInitialize() {
 
     Wallpapers_ = [[NSArray arrayWithObjects:@"Wallpaper.mp4", @"Wallpaper.png", @"Wallpaper.jpg", @"Wallpaper.html", nil] retain];
     Papered_ = $getTheme$(Wallpapers_) != nil;
+
+    Docked_ = $getTheme$([NSArray arrayWithObjects:@"Dock.png", nil]);
 
     if ([Info_ objectForKey:@"UndockedIconLabels"] == nil)
         [Info_ setObject:[NSNumber numberWithBool:(

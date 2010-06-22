@@ -30,6 +30,8 @@
 				<dict>
 					<key>wildcat</key>
 					<false/>
+					<key>voip</key>
+					<false/>
 				</dict>
 			</array>
 		</dict>
@@ -42,6 +44,8 @@
 			<array>
 				<dict>
 					<key>wildcat</key>
+					<false/>
+					<key>voip</key>
 					<false/>
 				</dict>
 			</array>
@@ -82,6 +86,8 @@
 				<dict>
 					<key>wildcat</key>
 					<false/>
+					<key>voip</key>
+					<false/>
 				</dict>
 			</array>
 		</dict>
@@ -94,6 +100,8 @@
 			<array>
 				<dict>
 					<key>wildcat</key>
+					<false/>
+					<key>voip</key>
 					<false/>
 				</dict>
 			</array>
@@ -136,6 +144,8 @@
 				<dict>
 					<key>wildcat</key>
 					<false/>
+					<key>voip</key>
+					<false/>
 				</dict>
 			</array>
 		</dict>
@@ -148,6 +158,8 @@
 			<array>
 				<dict>
 					<key>wildcat</key>
+					<false/>
+					<key>voip</key>
 					<false/>
 				</dict>
 			</array>

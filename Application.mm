@@ -39,6 +39,8 @@
 #import <CoreGraphics/CGGeometry.h>
 #import <UIKit/UIKit.h>
 
+#include <objc/objc-runtime.h>
+
 #import <Preferences/PSRootController.h>
 #import <Preferences/PSViewController.h>
 #import <Preferences/PSListController.h>
@@ -168,7 +170,7 @@ static Class $WBSettingsController;
     $WBSettingsController = [wbSettingsBundle principalClass];
 
     CGRect applicationFrame(([UIDevice instancesRespondToSelector:@selector(isWildcat)]
-                         && [[UIDevice currentDevice] isWildcat])
+                         && [[UIDevice currentDevice] isWildcat]) || objc_getClass("UIStatusBar") != nil
                           ? [UIScreen mainScreen].bounds
                           : [UIScreen mainScreen].applicationFrame);
     UIWindow *window([[UIWindow alloc] initWithFrame:applicationFrame]);
