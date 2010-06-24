@@ -777,7 +777,7 @@ MSHook(id, SBUIController$init, SBUIController *self, SEL sel) {
     IsWild_ = [device respondsToSelector:@selector(isWildcat)] && [device isWildcat];
 
     if (Papered_) {
-        UIWindow *&_wallpaperView(MSHookIvar<UIWindow *>(self, "_wallpaperView"));
+        UIImageView *&_wallpaperView(MSHookIvar<UIImageView *>(self, "_wallpaperView"));
         if (&_wallpaperView != NULL) {
             [_wallpaperView removeFromSuperview];
             [_wallpaperView release];
@@ -785,7 +785,6 @@ MSHook(id, SBUIController$init, SBUIController *self, SEL sel) {
         }
     }
 
-    UIWindow *&_window(MSHookIvar<UIWindow *>(self, "_window"));
     UIView *&_contentLayer(MSHookIvar<UIView *>(self, "_contentLayer"));
     UIView *&_contentView(MSHookIvar<UIView *>(self, "_contentView"));
 
@@ -796,18 +795,24 @@ MSHook(id, SBUIController$init, SBUIController *self, SEL sel) {
         player = &_contentView;
     else
         player = NULL;
-
     UIView *layer(player == NULL ? nil : *player);
 
-    UIView *content([[[UIView alloc] initWithFrame:[layer frame]] autorelease]);
+    UIWindow *window([[UIWindow alloc] initWithFrame:[[UIScreen mainScreen] bounds]]);
+    UIView *content([[[UIView alloc] initWithFrame:[window frame]] autorelease]);
+    [window setContentView:content];
+
+    UIWindow *&_window(MSHookIvar<UIWindow *>(self, "_window"));
+    [window setBackgroundColor:[_window backgroundColor]];
+    [_window setBackgroundColor:[UIColor clearColor]];
+
+    [window setLevel:-1000];
+    [window setHidden:NO];
 
     /*if (player != NULL)
         *player = content;*/
 
     [content setBackgroundColor:[layer backgroundColor]];
     [layer setBackgroundColor:[UIColor clearColor]];
-    [layer setFrame:[content bounds]];
-    [_window setContentView:content];
 
     UIView *indirect;
     if (!SummerBoard_ || !IsWild_)
@@ -928,8 +933,6 @@ MSHook(id, SBUIController$init, SBUIController *self, SEL sel) {
             [indirect addSubview:view];
         }
     }
-
-    [content addSubview:layer];
 
     return self;
 }
