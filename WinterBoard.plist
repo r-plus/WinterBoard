@@ -1,1 +1,5 @@
-Filter = {Bundles = ("com.apple.ImageIO.framework", "com.apple.MobileCoreServices");};
+Filter = {
+    Bundles = ("com.apple.UIKit");
+    Executables = ("lsd");
+    Mode = "Any";
+};
