@@ -8,7 +8,7 @@
 			<key>cell</key>
 			<string>PSGroupCell</string>
 			<key>footerText</key>
-			<string>WinterBoard can also be found under the normal iPhone OS Settings application.</string>
+			<string>WinterBoard can also be found under the normal iOS Settings application.</string>
 		</dict>
 		<dict>
 			<key>cell</key>
@@ -39,7 +39,7 @@
 			<key>cell</key>
 			<string>PSTitleValueCell</string>
 			<key>label</key>
-			<string>WinterBoard can also be found under the normal iPhone OS Settings application.</string>
+			<string>WinterBoard can also be found under the normal iOS Settings application.</string>
 			<key>requiredCapabilities</key>
 			<array>
 				<dict>
