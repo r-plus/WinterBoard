@@ -438,6 +438,7 @@ static NSString *_plist;
     unlink("/User/Library/Caches/com.apple.springboard-imagecache-icons.plist");
     unlink("/User/Library/Caches/com.apple.springboard-imagecache-smallicons");
     unlink("/User/Library/Caches/com.apple.springboard-imagecache-smallicons.plist");
+    unlink("/User/Library/Cache/com.apple.SpringBoard.folderSwitcherLinen");
 
     system("rm -rf /User/Library/Caches/SpringBoardIconCache");
     system("rm -rf /User/Library/Caches/SpringBoardIconCache-small");
