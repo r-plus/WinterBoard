@@ -776,6 +776,16 @@ MSHook(id, SBUIController$init, SBUIController *self, SEL sel) {
     UIDevice *device([UIDevice currentDevice]);
     IsWild_ = [device respondsToSelector:@selector(isWildcat)] && [device isWildcat];
 
+    if ([Info_ objectForKey:@"UndockedIconLabels"] == nil)
+        [Info_ setObject:[NSNumber numberWithBool:(
+            !(Papered_ || GSSystemHasCapability(CFSTR("homescreen-wallpaper"))) ||
+            [Info_ objectForKey:@"DockedIconLabelStyle"] != nil ||
+            [Info_ objectForKey:@"UndockedIconLabelStyle"] != nil
+        )] forKey:@"UndockedIconLabels"];
+
+    if (Debug_)
+        NSLog(@"WB:Debug:Info = %@", [Info_ description]);
+
     if (Papered_) {
         UIImageView *&_wallpaperView(MSHookIvar<UIImageView *>(self, "_wallpaperView"));
         if (&_wallpaperView != NULL) {
@@ -1800,16 +1810,6 @@ extern "C" void WBInitialize() {
     Papered_ = $getTheme$(Wallpapers_) != nil;
 
     Docked_ = $getTheme$([NSArray arrayWithObjects:@"Dock.png", nil]);
-
-    if ([Info_ objectForKey:@"UndockedIconLabels"] == nil)
-        [Info_ setObject:[NSNumber numberWithBool:(
-            !Papered_ ||
-            [Info_ objectForKey:@"DockedIconLabelStyle"] != nil ||
-            [Info_ objectForKey:@"UndockedIconLabelStyle"] != nil
-        )] forKey:@"UndockedIconLabels"];
-
-    if (Debug_)
-        NSLog(@"WB:Debug:Info = %@", [Info_ description]);
 
     [pool release];
 }
