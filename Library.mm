@@ -476,7 +476,7 @@ MSHook(UIImage *, SBApplicationIcon$icon, SBApplicationIcon *self, SEL sel) {
 MSHook(UIImage *, SBApplicationIcon$generateIconImage$, SBApplicationIcon *self, SEL sel, int type) {
     if (type == 2)
         if (![Info_ wb$boolForKey:@"ComposeStoreIcons"]) {
-            if (IsWild_)
+            if (IsWild_ && false) // XXX: delete this code, it should not be supported
                 if (NSString *path72 = $pathForIcon$([self application], @"-72"))
                     return [UIImage imageWithContentsOfFile:path72];
             if (NSString *path = $pathForIcon$([self application]))
