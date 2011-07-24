@@ -1404,6 +1404,8 @@ MSHook(void, TranscriptController$loadView, mSMSMessageTranscriptController *sel
 MSHook(UIImage *, _UIImageWithName, NSString *name) {
     if (Debug_)
         NSLog(@"WB:Debug: _UIImageWithName(\"%@\")", name);
+    if (name == nil)
+        return nil;
 
     int identifier;
     bool packed;
