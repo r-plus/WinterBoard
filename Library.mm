@@ -776,9 +776,11 @@ MSHook(id, SBUIController$init, SBUIController *self, SEL sel) {
     UIDevice *device([UIDevice currentDevice]);
     IsWild_ = [device respondsToSelector:@selector(isWildcat)] && [device isWildcat];
 
+    BOOL (*GSSystemHasCapability)(CFStringRef) = reinterpret_cast<BOOL (*)(CFStringRef)>(dlsym(RTLD_DEFAULT, "GSSystemHasCapability"));
+
     if ([Info_ objectForKey:@"UndockedIconLabels"] == nil)
         [Info_ setObject:[NSNumber numberWithBool:(
-            !(Papered_ || GSSystemHasCapability(CFSTR("homescreen-wallpaper"))) ||
+            !(Papered_ || GSSystemHasCapability != NULL && GSSystemHasCapability(CFSTR("homescreen-wallpaper"))) ||
             [Info_ objectForKey:@"DockedIconLabelStyle"] != nil ||
             [Info_ objectForKey:@"UndockedIconLabelStyle"] != nil
         )] forKey:@"UndockedIconLabels"];
