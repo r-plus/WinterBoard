@@ -1731,12 +1731,16 @@ extern "C" void WBInitialize() {
 
         $WebCoreFrameBridge = objc_getClass("WebCoreFrameBridge");
 
+        bool olden(dlsym(RTLD_DEFAULT, "GSLibraryCopyGenerationInfoValueForKey") == NULL);
+
+        if (olden)
+            $SBCalendarIconContentsView = objc_getClass("SBCalendarIconContentsView");
+
         $SBApplication = objc_getClass("SBApplication");
         $SBApplicationIcon = objc_getClass("SBApplicationIcon");
         $SBAwayView = objc_getClass("SBAwayView");
         $SBBookmarkIcon = objc_getClass("SBBookmarkIcon");
         $SBButtonBar = objc_getClass("SBButtonBar");
-        $SBCalendarIconContentsView = objc_getClass("SBCalendarIconContentsView");
         $SBDockIconListView = objc_getClass("SBDockIconListView");
         $SBIcon = objc_getClass("SBIcon");
         $SBIconBadge = objc_getClass("SBIconBadge");
@@ -1776,7 +1780,9 @@ extern "C" void WBInitialize() {
         WBRename(SBDockIconListView, setFrame:, setFrame$);
         MSHookMessage(object_getClass($SBDockIconListView), @selector(shouldShowNewDock), &$SBDockIconListView$shouldShowNewDock, &_SBDockIconListView$shouldShowNewDock);
 
-        WBRename(SBIconLabel, drawRect:, drawRect$);
+        if (olden)
+            WBRename(SBIconLabel, drawRect:, drawRect$);
+
         WBRename(SBIconLabel, initWithSize:label:, initWithSize$label$);
         WBRename(SBIconLabel, setInDock:, setInDock$);
 
