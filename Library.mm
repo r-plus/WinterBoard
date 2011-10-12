@@ -137,6 +137,7 @@ Class $SBIconController;
 Class $SBIconLabel;
 Class $SBIconList;
 Class $SBIconModel;
+Class $SBIconView;
 //Class $SBImageCache;
 Class $SBSearchView;
 Class $SBSearchTableViewCell;
@@ -146,6 +147,8 @@ Class $SBStatusBarOperatorNameView;
 Class $SBStatusBarTimeView;
 Class $SBUIController;
 Class $SBWidgetApplicationIcon;
+
+#define SBIconView SBIcon
 
 static bool IsWild_;
 static bool Four_;
@@ -1093,6 +1096,29 @@ WBDelegate(badge_)
 @end
 /* }}} */
 
+MSHook(void, SBIconView$setIconImageAlpha$, SBIconView *self, SEL sel, float alpha) {
+    if (NSNumber *number = [Info_ objectForKey:@"IconAlpha"])
+        alpha = [number floatValue];
+    return _SBIconView$setIconImageAlpha$(self, sel, alpha);
+}
+
+MSHook(void, SBIconView$setIconLabelAlpha$, SBIconView *self, SEL sel, float alpha) {
+    if (NSNumber *number = [Info_ objectForKey:@"IconAlpha"])
+        alpha = [number floatValue];
+    return _SBIconView$setIconLabelAlpha$(self, sel, alpha);
+}
+
+MSHook(id, SBIconView$initWithDefaultSize, SBIconView *self, SEL sel) {
+    if ((self = _SBIconView$initWithDefaultSize(self, sel)) != nil) {
+        if (NSNumber *number = [Info_ objectForKey:@"IconAlpha"]) {
+            // XXX: note: this is overridden above, which is silly
+            float alpha([number floatValue]);
+            [self setIconImageAlpha:alpha];
+            [self setIconLabelAlpha:alpha];
+        }
+    } return self;
+}
+
 MSHook(void, SBIcon$setAlpha$, SBIcon *self, SEL sel, float alpha) {
     if (NSNumber *number = [Info_ objectForKey:@"IconAlpha"])
         alpha = [number floatValue];
@@ -1761,6 +1787,7 @@ extern "C" void WBInitialize() {
         $SBIconLabel = objc_getClass("SBIconLabel");
         $SBIconList = objc_getClass("SBIconList");
         $SBIconModel = objc_getClass("SBIconModel");
+        $SBIconView = objc_getClass("SBIconView");
         //$SBImageCache = objc_getClass("SBImageCache");
         $SBSearchView = objc_getClass("SBSearchView");
         $SBSearchTableViewCell = objc_getClass("SBSearchTableViewCell");
@@ -1770,6 +1797,9 @@ extern "C" void WBInitialize() {
         $SBStatusBarTimeView = objc_getClass("SBStatusBarTimeView");
         $SBUIController = objc_getClass("SBUIController");
         $SBWidgetApplicationIcon = objc_getClass("SBWidgetApplicationIcon");
+
+        if ($SBIconView == nil)
+            $SBIconView = $SBIcon;
 
         Four_ = $SBDockIconListView != nil;
 
@@ -1787,6 +1817,9 @@ extern "C" void WBInitialize() {
         WBRename(SBIcon, setAlpha:, setAlpha$);
         WBRename(SBIconBadge, initWithBadge:, initWithBadge$);
         WBRename(SBIconController, noteNumberOfIconListsChanged, noteNumberOfIconListsChanged);
+        WBRename(SBIconView, initWithDefaultSize, initWithDefaultSize);
+        WBRename(SBIconView, setIconImageAlpha:, setIconImageAlpha$);
+        WBRename(SBIconView, setIconLabelAlpha:, setIconLabelAlpha$);
         WBRename(SBUIController, init, init);
         WBRename(SBWidgetApplicationIcon, icon, icon);
 
