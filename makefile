@@ -50,8 +50,9 @@ package: all
 	cp -a WinterBoard.plist winterboard/Library/MobileSubstrate/DynamicLibraries
 	cp -a *.theme winterboard/Library/Themes
 	find winterboard -name .svn | while read -r line; do rm -rf "$${line}"; done
-	cp -a control extrainst_ preinst prerm winterboard/DEBIAN
+	cp -a extrainst_ preinst prerm winterboard/DEBIAN
+	sed -e 's/VERSION/$(shell ./version.sh)/g' control >winterboard/DEBIAN/control
 	cp -a Test.sh Icon-Small.png icon.png WinterBoard.dylib WinterBoard UIImages Info.plist winterboard/Applications/WinterBoard.app
-	dpkg-deb -b winterboard winterboard_$(shell grep ^Version: control | cut -d ' ' -f 2)_iphoneos-arm.deb
+	dpkg-deb -b winterboard "winterboard_$$(grep ^Version: winterboard/DEBIAN/control | cut -d ' ' -f 2)_iphoneos-arm.deb"
 
 .PHONY: all clean package
