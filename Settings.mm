@@ -438,11 +438,19 @@ static NSString *_plist;
     unlink("/User/Library/Caches/com.apple.springboard-imagecache-icons.plist");
     unlink("/User/Library/Caches/com.apple.springboard-imagecache-smallicons");
     unlink("/User/Library/Caches/com.apple.springboard-imagecache-smallicons.plist");
+
     unlink("/User/Library/Cache/com.apple.SpringBoard.folderSwitcherLinen");
+    unlink("/User/Library/Cache/com.apple.SpringBoard.notificationCenterLinen");
+
+    unlink("/User/Library/Cache/com.apple.SpringBoard.folderSwitcherLinen.0");
+    unlink("/User/Library/Cache/com.apple.SpringBoard.folderSwitcherLinen.1");
+    unlink("/User/Library/Cache/com.apple.SpringBoard.folderSwitcherLinen.2");
+    unlink("/User/Library/Cache/com.apple.SpringBoard.folderSwitcherLinen.3");
 
     system("rm -rf /User/Library/Caches/SpringBoardIconCache");
     system("rm -rf /User/Library/Caches/SpringBoardIconCache-small");
     system("rm -rf /User/Library/Caches/com.apple.IconsCache");
+    system("rm -rf /User/Library/Caches/com.apple.springboard.sharedimagecache");
 
     system("killall lsd SpringBoard");
 }
