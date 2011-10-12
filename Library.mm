@@ -101,6 +101,8 @@ bool _itv;
 
 #import <ChatKit/CKMessageCell.h>
 
+#include <sys/sysctl.h>
+
 extern "C" void __clear_cache (char *beg, char *end);
 
 @protocol WinterBoard
@@ -773,8 +775,19 @@ MSHook(id, SBUIController$init, SBUIController *self, SEL sel) {
     if (self == nil)
         return nil;
 
-    UIDevice *device([UIDevice currentDevice]);
-    IsWild_ = [device respondsToSelector:@selector(isWildcat)] && [device isWildcat];
+    {
+        size_t size;
+        sysctlbyname("hw.machine", NULL, &size, NULL, 0);
+        char *machine = new char[size];
+
+        if (sysctlbyname("hw.machine", machine, &size, NULL, 0) == -1) {
+            perror("sysctlbyname(\"hw.machine\", ?)");
+            delete [] machine;
+            machine = NULL;
+        }
+
+        IsWild_ = machine != NULL && strncmp(machine, "iPad", 4) == 0;
+    }
 
     BOOL (*GSSystemHasCapability)(CFStringRef) = reinterpret_cast<BOOL (*)(CFStringRef)>(dlsym(RTLD_DEFAULT, "GSSystemHasCapability"));
 
