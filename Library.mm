@@ -563,24 +563,23 @@ MSHook(CGImageRef, _UIImageRefAtPath, NSString *name, bool cache, UIImageOrienta
     return __UIImageRefAtPath(themed, cache, orientation, scale);
 }
 
-/*MSHook(UIImage *, _UIImageAtPath, NSString *name, NSBundle *bundle) {
-    if (bundle == nil)
-        return __UIImageAtPath(name, nil);
-    else {
-        NSString *key = [NSString stringWithFormat:@"B:%@/%@", [bundle bundleIdentifier], name];
-        UIImage *image = [PathImages_ objectForKey:key];
-        if (image != nil)
-            return reinterpret_cast<id>(image) == [NSNull null] ? nil : image;
-        if (Debug_)
-            NSLog(@"WB:Debug: _UIImageAtPath(\"%@\", %@)", name, bundle);
-        if (NSString *path = $pathForFile$inBundle$(name, bundle, false))
-            image = CachedImageAtPath(path);
-        if (image == nil)
-            image = __UIImageAtPath(name, bundle);
-        [PathImages_ setObject:(image == nil ? [NSNull null] : reinterpret_cast<id>(image)) forKey:key];
-        return image;
-    }
-}*/
+MSHook(UIImage *, _UIImageAtPath, NSString *name, NSBundle *bundle) {
+    if (Debug_)
+        NSLog(@"WB:Debug: _UIImageAtPath(\"%@\", %@)", name, bundle);
+
+    NSString *file([name rangeOfString:@"."].location != NSNotFound ? name : [name stringByAppendingString:@".png"]);
+
+    NSString *key = [NSString stringWithFormat:@"B:%@/%@", bundle == nil ? @"" : [bundle bundleIdentifier], name];
+    UIImage *image = [PathImages_ objectForKey:key];
+    if (image != nil)
+        return reinterpret_cast<id>(image) == [NSNull null] ? nil : image;
+    if (NSString *path = $pathForFile$inBundle$(file, bundle, false))
+        image = CachedImageAtPath(path);
+    if (image == nil)
+        image = __UIImageAtPath(name, bundle);
+    [PathImages_ setObject:(image == nil ? [NSNull null] : reinterpret_cast<id>(image)) forKey:key];
+    return image;
+}
 
 MSHook(UIImage *, _UIApplicationImageWithName, NSString *name) {
     NSBundle *bundle = [NSBundle mainBundle];
@@ -1623,6 +1622,7 @@ extern "C" void WBInitialize() {
         nlset(_UISharedImageNameGetIdentifier, nl, 6);
 
         MSHookFunction(_UIApplicationImageWithName, &$_UIApplicationImageWithName, &__UIApplicationImageWithName);
+        MSHookFunction(_UIImageAtPath, &$_UIImageAtPath, &__UIImageAtPath);
         MSHookFunction(_UIImageRefAtPath, &$_UIImageRefAtPath, &__UIImageRefAtPath);
         MSHookFunction(_UIImageWithName, &$_UIImageWithName, &__UIImageWithName);
         MSHookFunction(_UIImageWithNameInDomain, &$_UIImageWithNameInDomain, &__UIImageWithNameInDomain);
