@@ -53,6 +53,7 @@ package: all
 	cp -a extrainst_ preinst prerm winterboard/DEBIAN
 	sed -e 's/VERSION/$(shell ./version.sh)/g' control >winterboard/DEBIAN/control
 	cp -a Test.sh Icon-Small.png icon.png WinterBoard.dylib WinterBoard UIImages Info.plist winterboard/Applications/WinterBoard.app
-	dpkg-deb -b winterboard "winterboard_$$(grep ^Version: winterboard/DEBIAN/control | cut -d ' ' -f 2)_iphoneos-arm.deb"
+	file="winterboard_$$(grep ^Version: winterboard/DEBIAN/control | cut -d ' ' -f 2)_iphoneos-arm.deb"; echo "$$file"; ln -sf "$$file" winterboard.deb
+	dpkg-deb -b winterboard winterboard.deb
 
 .PHONY: all clean package
