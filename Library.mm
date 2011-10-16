@@ -1,5 +1,5 @@
 /* WinterBoard - Theme Manager for the iPhone
- * Copyright (C) 2008-2010  Jay Freeman (saurik)
+ * Copyright (C) 2008-2011  Jay Freeman (saurik)
 */
 
 /*
@@ -47,7 +47,7 @@ bool _itv;
         _itv = true; \
         _ltv = _ctv; \
     } \
-    fprintf(stderr, "%lu.%.6u[%f]:_trace()@%s:%u[%s]\n", \
+    NSLog(@"%lu.%.6u[%f]:_trace()@%s:%u[%s]\n", \
         _ctv.tv_sec, _ctv.tv_usec, \
         (_ctv.tv_sec - _ltv.tv_sec) + (_ctv.tv_usec - _ltv.tv_usec) / 1000000.0, \
         __FILE__, __LINE__, __FUNCTION__\
@@ -111,47 +111,51 @@ extern "C" void __clear_cache (char *beg, char *end);
 
 Class $MPMoviePlayerController;
 Class $MPVideoView;
-Class $WebCoreFrameBridge;
 
-Class $NSBundle;
+MSClassHook(NSBundle)
 
-Class $UIImage;
-Class $UINavigationBar;
-Class $UIToolbar;
+MSClassHook(UIImage)
+MSClassHook(UINavigationBar)
+MSClassHook(UIToolbar)
 
-Class $CKMessageCell;
-Class $CKTimestampView;
-Class $CKTranscriptController;
-Class $CKTranscriptTableView;
+MSClassHook(CKMessageCell)
+MSClassHook(CKTimestampView)
+MSClassHook(CKTranscriptController)
+MSClassHook(CKTranscriptTableView)
 
-Class $SBApplication;
-Class $SBApplicationIcon;
-Class $SBAwayView;
-Class $SBBookmarkIcon;
-Class $SBButtonBar;
-Class $SBCalendarIconContentsView;
-Class $SBDockIconListView;
-Class $SBIcon;
-Class $SBIconBadge;
-Class $SBIconController;
-Class $SBIconLabel;
-Class $SBIconList;
-Class $SBIconModel;
-Class $SBIconView;
-//Class $SBImageCache;
-Class $SBSearchView;
-Class $SBSearchTableViewCell;
-Class $SBStatusBarContentsView;
-Class $SBStatusBarController;
-Class $SBStatusBarOperatorNameView;
-Class $SBStatusBarTimeView;
-Class $SBUIController;
-Class $SBWidgetApplicationIcon;
+MSClassHook(SBApplication)
+MSClassHook(SBApplicationIcon)
+MSClassHook(SBAwayView)
+MSClassHook(SBBookmarkIcon)
+MSClassHook(SBButtonBar)
+MSClassHook(SBCalendarIconContentsView)
+MSClassHook(SBDockIconListView)
+MSClassHook(SBIcon)
+MSClassHook(SBIconBadge)
+MSClassHook(SBIconController)
+MSClassHook(SBIconLabel)
+MSClassHook(SBIconList)
+MSClassHook(SBIconModel)
+//MSClassHook(SBImageCache)
+MSClassHook(SBSearchView)
+MSClassHook(SBSearchTableViewCell)
+MSClassHook(SBStatusBarContentsView)
+MSClassHook(SBStatusBarController)
+MSClassHook(SBStatusBarOperatorNameView)
+MSClassHook(SBStatusBarTimeView)
+MSClassHook(SBUIController)
+MSClassHook(SBWidgetApplicationIcon)
 
-#define SBIconView SBIcon
+__attribute__((__constructor__))
+static void MSFixClass() {
+    if ($SBIcon == nil)
+        $SBIcon = objc_getClass("SBIconView");
+    if ($CKTranscriptController == nil)
+        $CKTranscriptController = objc_getClass("mSMSMessageTranscriptController");
+}
 
 static bool IsWild_;
-static bool Four_;
+static bool Four_($SBDockIconListView != nil);
 
 @interface NSDictionary (WinterBoard)
 - (UIColor *) wb$colorForKey:(NSString *)key;
@@ -186,51 +190,60 @@ static bool SummerBoard_ = true;
 static bool SpringBoard_;
 
 static UIImage *(*_UIApplicationImageWithName)(NSString *name);
-static UIImage *(*_UIImageAtPath)(NSString *name, NSBundle *path);
-static CGImageRef (*_UIImageRefAtPath)(NSString *name, bool cache, UIImageOrientation *orientation, float *scale);
 static UIImage *(*_UIImageWithNameInDomain)(NSString *name, NSString *domain);
 static NSBundle *(*_UIKitBundle)();
 static bool (*_UIPackedImageTableGetIdentifierForName)(NSString *, int *);
 static int (*_UISharedImageNameGetIdentifier)(NSString *);
 
-static NSMutableDictionary *UIImages_;
-static NSMutableDictionary *PathImages_;
-static NSMutableDictionary *Cache_;
-static NSMutableDictionary *Strings_;
-static NSMutableDictionary *Themed_;
-static NSMutableDictionary *Bundles_;
+static NSMutableDictionary *UIImages_ = [[NSMutableDictionary alloc] initWithCapacity:32];
+static NSMutableDictionary *PathImages_ = [[NSMutableDictionary alloc] initWithCapacity:16];
+static NSMutableDictionary *Cache_ = [[NSMutableDictionary alloc] initWithCapacity:64];
+static NSMutableDictionary *Strings_ = [[NSMutableDictionary alloc] initWithCapacity:0];
+static NSMutableDictionary *Bundles_ = [[NSMutableDictionary alloc] initWithCapacity:2];
 
 static NSFileManager *Manager_;
+static NSMutableArray *Themes_;
+
 static NSDictionary *English_;
 static NSMutableDictionary *Info_;
-static NSMutableArray *themes_;
 
-static NSString *$getTheme$(NSArray *files, bool parent = false) {
-    if (!parent)
-        if (NSString *path = [Themed_ objectForKey:files])
-            return reinterpret_cast<id>(path) == [NSNull null] ? nil : path;
+// $getTheme$() {{{
+static NSMutableDictionary *Themed_ = [[NSMutableDictionary alloc] initWithCapacity:128];
+
+static unsigned Scale_ = 0;
+
+static NSString *$getTheme$(NSArray *files, bool rescale = false) {
+    if (NSString *path = [Themed_ objectForKey:files])
+        return reinterpret_cast<id>(path) == [NSNull null] ? nil : path;
+
+    if (rescale && Scale_ == 0) {
+        UIScreen *screen([UIScreen mainScreen]);
+        if ([screen respondsToSelector:@selector(scale)])
+            Scale_ = [screen scale];
+        else
+            Scale_ = 1;
+    }
 
     if (Debug_)
         NSLog(@"WB:Debug: %@", [files description]);
 
     NSString *path;
 
-    for (NSString *theme in themes_)
+    for (NSString *theme in Themes_)
         for (NSString *file in files) {
             path = [NSString stringWithFormat:@"%@/%@", theme, file];
-            if ([Manager_ fileExistsAtPath:path]) {
-                path = parent ? theme : path;
+            if ([Manager_ fileExistsAtPath:path])
                 goto set;
-            }
         }
 
     path = nil;
   set:
-    if (!parent)
-        [Themed_ setObject:(path == nil ? [NSNull null] : reinterpret_cast<id>(path)) forKey:files];
+
+    [Themed_ setObject:(path == nil ? [NSNull null] : reinterpret_cast<id>(path)) forKey:files];
     return path;
 }
-
+// }}}
+// $pathForFile$inBundle$() {{{
 static NSString *$pathForFile$inBundle$(NSString *file, NSBundle *bundle, bool ui) {
     NSString *identifier = [bundle bundleIdentifier];
     NSMutableArray *names = [NSMutableArray arrayWithCapacity:8];
@@ -258,11 +271,12 @@ static NSString *$pathForFile$inBundle$(NSString *file, NSBundle *bundle, bool u
         remapResourceName(Four_ ? @"SBDockBG-old.png" : @"SBDockBG.png", @"Dock")
         remapResourceName(@"SBWeatherCelsius.png", @"Icons/Weather")
 
-    if (NSString *path = $getTheme$(names))
+    if (NSString *path = $getTheme$(names, ui))
         return path;
 
     return nil;
 }
+// }}}
 
 static NSString *$pathForIcon$(SBApplication *self, NSString *suffix = @"") {
     NSString *identifier = [self bundleIdentifier];
@@ -310,6 +324,7 @@ static NSString *$pathForIcon$(SBApplication *self, NSString *suffix = @"") {
     return nil;
 }
 
+// -[NSBundle wb$bundleWithFile] {{{
 @interface NSBundle (WinterBoard)
 + (NSBundle *) wb$bundleWithFile:(NSString *)path;
 @end
@@ -338,7 +353,8 @@ static NSString *$pathForIcon$(SBApplication *self, NSString *suffix = @"") {
 }
 
 @end
-
+// }}}
+// -[NSString wb$themedPath] {{{
 @interface NSString (WinterBoard)
 - (NSString *) wb$themedPath;
 @end
@@ -364,6 +380,7 @@ static NSString *$pathForIcon$(SBApplication *self, NSString *suffix = @"") {
 }
 
 @end
+// }}}
 
 void WBLogRect(const char *tag, struct CGRect rect) {
     NSLog(@"%s:{%f,%f+%f,%f}", tag, rect.origin.x, rect.origin.y, rect.size.width, rect.size.height);
@@ -531,56 +548,6 @@ static UIImage *CachedImageAtPath(NSString *path) {
     return image;
 }
 
-MSHook(CGImageSourceRef, CGImageSourceCreateWithURL, CFURLRef url, CFDictionaryRef options) {
-    if (Debug_)
-        NSLog(@"WB:Debug: CGImageSourceCreateWithURL(\"%@\", %s)", url, options);
-    NSAutoreleasePool *pool([[NSAutoreleasePool alloc] init]);
-    if (NSString *path = (NSString *) CFURLCopyFileSystemPath(url, kCFURLPOSIXPathStyle))
-        if (NSString *themed = [path wb$themedPath])
-            if (themed != path)
-                url = (CFURLRef) [NSURL fileURLWithPath:themed];
-    CGImageSourceRef source(_CGImageSourceCreateWithURL(url, options));
-    [pool release];
-    return source;
-}
-
-MSHook(CGImageRef, _UIImageRefAtPath, NSString *name, bool cache, UIImageOrientation *orientation, float *scale) {
-    if (Debug_)
-        NSLog(@"WB:Debug: _UIImageRefAtPath(\"%@\")", name);
-
-    NSString *themed([name wb$themedPath]);
-
-    if (false && SpringBoard_ && SummerBoard_ && themed == name) {
-        if ([name isEqualToString:@"/System/Library/CoreServices/SpringBoard.app/SBDockBGT-Portrait.png"])
-            if (NSString *path = $getTheme$([NSArray arrayWithObject:@"Dock.png"])) {
-                UIImage *image([UIImage imageWithContentsOfFile:path]);
-                CGImageRef ref([[image _imageScaledToProportion:2.4 interpolationQuality:5] imageRef]);
-                CGImageRetain(ref);
-                return ref;
-            }
-    }
-
-    return __UIImageRefAtPath(themed, cache, orientation, scale);
-}
-
-MSHook(UIImage *, _UIImageAtPath, NSString *name, NSBundle *bundle) {
-    if (Debug_)
-        NSLog(@"WB:Debug: _UIImageAtPath(\"%@\", %@)", name, bundle);
-
-    NSString *file([name rangeOfString:@"."].location != NSNotFound ? name : [name stringByAppendingString:@".png"]);
-
-    NSString *key = [NSString stringWithFormat:@"B:%@/%@", bundle == nil ? @"" : [bundle bundleIdentifier], name];
-    UIImage *image = [PathImages_ objectForKey:key];
-    if (image != nil)
-        return reinterpret_cast<id>(image) == [NSNull null] ? nil : image;
-    if (NSString *path = $pathForFile$inBundle$(file, bundle, false))
-        image = CachedImageAtPath(path);
-    if (image == nil)
-        image = __UIImageAtPath(name, bundle);
-    [PathImages_ setObject:(image == nil ? [NSNull null] : reinterpret_cast<id>(image)) forKey:key];
-    return image;
-}
-
 MSHook(UIImage *, _UIApplicationImageWithName, NSString *name) {
     NSBundle *bundle = [NSBundle mainBundle];
     if (Debug_)
@@ -608,29 +575,16 @@ MSHook(UIImage *, _UIApplicationImageWithName, NSString *name) {
             NSLog(@"WB:Error: [%s forwardInvocation:(%s)]", class_getName([self class]), sel_getName(sel)); \
     }
 
-MSHook(NSString *, NSBundle$pathForResource$ofType$, NSBundle *self, SEL sel, NSString *resource, NSString *type) {
+// %hook -[NSBundle pathForResource:ofType:] {{{
+MSInstanceMessageHook2(NSString *, NSBundle, pathForResource,ofType, NSString *, resource, NSString *, type) {
     NSString *file = type == nil ? resource : [NSString stringWithFormat:@"%@.%@", resource, type];
     if (Debug_)
         NSLog(@"WB:Debug: [NSBundle(%@) pathForResource:\"%@\"]", [self bundleIdentifier], file);
     if (NSString *path = $pathForFile$inBundle$(file, self, false))
         return path;
-    return _NSBundle$pathForResource$ofType$(self, sel, resource, type);
+    return MSOldCall(resource, type);
 }
-
-void $setBarStyle$_(NSString *name, int &style) {
-    if (Debug_)
-        NSLog(@"WB:Debug:%@Style:%d", name, style);
-    NSNumber *number = nil;
-    if (number == nil)
-        number = [Info_ objectForKey:[NSString stringWithFormat:@"%@Style-%d", name, style]];
-    if (number == nil)
-        number = [Info_ objectForKey:[NSString stringWithFormat:@"%@Style", name]];
-    if (number != nil) {
-        style = [number intValue];
-        if (Debug_)
-            NSLog(@"WB:Debug:%@Style=%d", name, style);
-    }
-}
+// }}}
 
 MSHook(void, SBCalendarIconContentsView$drawRect$, SBCalendarIconContentsView *self, SEL sel, CGRect rect) {
     NSBundle *bundle([NSBundle mainBundle]);
@@ -702,43 +656,32 @@ MSHook(void, SBCalendarIconContentsView$drawRect$, SBCalendarIconContentsView *s
     CFRelease(day);
 }
 
-/*static id UINavigationBarBackground$initWithFrame$withBarStyle$withTintColor$(UINavigationBarBackground<WinterBoard> *self, SEL sel, CGRect frame, int style, UIColor *tint) {
-_trace();
-
-    if (NSNumber *number = [Info_ objectForKey:@"NavigationBarStyle"])
+// %hook -[{NavigationBar,Toolbar} setBarStyle:] {{{
+void $setBarStyle$_(NSString *name, int &style) {
+    if (Debug_)
+        NSLog(@"WB:Debug:%@Style:%d", name, style);
+    NSNumber *number = nil;
+    if (number == nil)
+        number = [Info_ objectForKey:[NSString stringWithFormat:@"%@Style-%d", name, style]];
+    if (number == nil)
+        number = [Info_ objectForKey:[NSString stringWithFormat:@"%@Style", name]];
+    if (number != nil) {
         style = [number intValue];
-
-    if (UIColor *color = [Info_ wb$colorForKey:@"NavigationBarTint"])
-        tint = color;
-
-    return [self wb$initWithFrame:frame withBarStyle:style withTintColor:tint];
-}*/
-
-/*static id UINavigationBar$initWithCoder$(SBAppWindow<WinterBoard> *self, SEL sel, CGRect frame, NSCoder *coder) {
-    self = [self wb$initWithCoder:coder];
-    if (self == nil)
-        return nil;
-    UINavigationBar$setBarStyle$_(self);
-    return self;
+        if (Debug_)
+            NSLog(@"WB:Debug:%@Style=%d", name, style);
+    }
 }
 
-static id UINavigationBar$initWithFrame$(SBAppWindow<WinterBoard> *self, SEL sel, CGRect frame) {
-    self = [self wb$initWithFrame:frame];
-    if (self == nil)
-        return nil;
-    UINavigationBar$setBarStyle$_(self);
-    return self;
-}*/
-
-MSHook(void, UIToolbar$setBarStyle$, UIToolbar *self, SEL sel, int style) {
+MSInstanceMessageHook1(void, UIToolbar, setBarStyle, int, style) {
     $setBarStyle$_(@"Toolbar", style);
-    return _UIToolbar$setBarStyle$(self, sel, style);
+    return MSOldCall(style);
 }
 
-MSHook(void, UINavigationBar$setBarStyle$, UINavigationBar *self, SEL sel, int style) {
+MSInstanceMessageHook1(void, UINavigationBar, setBarStyle, int, style) {
     $setBarStyle$_(@"NavigationBar", style);
-    return _UINavigationBar$setBarStyle$(self, sel, style);
+    return MSOldCall(style);
 }
+// }}}
 
 MSHook(void, SBButtonBar$didMoveToSuperview, UIView *self, SEL sel) {
     [[self superview] setBackgroundColor:[UIColor clearColor]];
@@ -772,10 +715,35 @@ static NSURL *WallpaperURL_;
         object = nil; \
     } while (false)
 
-MSHook(id, SBUIController$init, SBUIController *self, SEL sel) {
-    self = _SBUIController$init(self, sel);
+static UIImage *$getImage$(NSString *path) {
+    NSString *name(path);
+
+    #define StripName(strip) \
+        if ([name hasSuffix:@ strip]) \
+            name = [name substringWithRange:NSMakeRange(0, [name length] - sizeof(strip) - 1)];
+
+    StripName(".png");
+    StripName(".jpg");
+    StripName("~iphone");
+    StripName("~ipad");
+
+    unsigned scale([name hasSuffix:@"@2x"] ? 2 : 1);
+
+    UIImage *image([UIImage imageWithContentsOfFile:path]);
+
+    if (scale != 1 && [image respondsToSelector:@selector(setScale)])
+        [image setScale:scale];
+
+    return image;
+}
+
+// %hook -[SBUIController init] {{{
+MSInstanceMessageHook0(id, SBUIController, init) {
+    self = MSOldCall();
     if (self == nil)
         return nil;
+
+    NSString *paper($getTheme$(Wallpapers_, true));
 
     {
         size_t size;
@@ -795,7 +763,7 @@ MSHook(id, SBUIController$init, SBUIController *self, SEL sel) {
 
     if ([Info_ objectForKey:@"UndockedIconLabels"] == nil)
         [Info_ setObject:[NSNumber numberWithBool:(
-            !(Papered_ || GSSystemHasCapability != NULL && GSSystemHasCapability(CFSTR("homescreen-wallpaper"))) ||
+            !(paper != nil || GSSystemHasCapability != NULL && GSSystemHasCapability(CFSTR("homescreen-wallpaper"))) ||
             [Info_ objectForKey:@"DockedIconLabelStyle"] != nil ||
             [Info_ objectForKey:@"UndockedIconLabelStyle"] != nil
         )] forKey:@"UndockedIconLabels"];
@@ -803,7 +771,7 @@ MSHook(id, SBUIController$init, SBUIController *self, SEL sel) {
     if (Debug_)
         NSLog(@"WB:Debug:Info = %@", [Info_ description]);
 
-    if (Papered_) {
+    if (paper != nil) {
         UIImageView *&_wallpaperView(MSHookIvar<UIImageView *>(self, "_wallpaperView"));
         if (&_wallpaperView != NULL) {
             [_wallpaperView removeFromSuperview];
@@ -857,9 +825,8 @@ MSHook(id, SBUIController$init, SBUIController *self, SEL sel) {
     _release(WallpaperPage_);
     _release(WallpaperURL_);
 
-    if (NSString *theme = $getTheme$(Wallpapers_, true)) {
-        NSString *mp4 = [theme stringByAppendingPathComponent:@"Wallpaper.mp4"];
-        if ([Manager_ fileExistsAtPath:mp4]) {
+    if (NSString *path = paper) {
+        if ([path hasSuffix:@".mp4"]) {
 #if UseAVController
             NSError *error;
 
@@ -874,18 +841,18 @@ MSHook(id, SBUIController$init, SBUIController *self, SEL sel) {
             UIView *video([[[UIView alloc] initWithFrame:[indirect bounds]] autorelease]);
             [controller_ setLayer:[video _layer]];
 
-            AVItem *item([[[AVItem alloc] initWithPath:mp4 error:&error] autorelease]);
+            AVItem *item([[[AVItem alloc] initWithPath:path error:&error] autorelease]);
             [queue appendItem:item error:&error];
 
             [controller_ play:&error];
 #elif UseMPMoviePlayerController
-            NSURL *url([NSURL fileURLWithPath:mp4]);
+            NSURL *url([NSURL fileURLWithPath:path]);
             MPMoviePlayerController *controller = [[$MPMoviePlayerController alloc] initWithContentURL:url];
 	    controller.movieControlMode = MPMovieControlModeHidden;
 	    [controller play];
 #else
             MPVideoView *video = [[[$MPVideoView alloc] initWithFrame:[indirect bounds]] autorelease];
-            [video setMovieWithPath:mp4];
+            [video setMovieWithPath:path];
             [video setRepeatMode:1];
             [video setRepeatGap:-1];
             [video playFromBeginning];;
@@ -894,40 +861,24 @@ MSHook(id, SBUIController$init, SBUIController *self, SEL sel) {
             [indirect addSubview:video];
         }
 
-        NSString *png = [theme stringByAppendingPathComponent:@"Wallpaper.png"];
-        NSString *jpg = [theme stringByAppendingPathComponent:@"Wallpaper.jpg"];
-
-        NSString *path;
-        if ([Manager_ fileExistsAtPath:png])
-            path = png;
-        else if ([Manager_ fileExistsAtPath:jpg])
-            path = jpg;
-        else path = nil;
-
-        UIImage *image;
-        if (path != nil) {
-            image = [[UIImage alloc] initWithContentsOfFile:path];
-            if (image != nil)
-                image = [image autorelease];
-        } else image = nil;
-
-        if (image != nil) {
-            WallpaperFile_ = [path retain];
-            WallpaperImage_ = [[UIImageView alloc] initWithImage:image];
-            if (NSNumber *number = [Info_ objectForKey:@"WallpaperAlpha"])
-                [WallpaperImage_ setAlpha:[number floatValue]];
-            [indirect addSubview:WallpaperImage_];
+        if ([path hasSuffix:@".png"] || [path hasSuffix:@".jpg"]) {
+            if (UIImage *image = $getImage$(path)) {
+                WallpaperFile_ = [path retain];
+                WallpaperImage_ = [[UIImageView alloc] initWithImage:image];
+                if (NSNumber *number = [Info_ objectForKey:@"WallpaperAlpha"])
+                    [WallpaperImage_ setAlpha:[number floatValue]];
+                [indirect addSubview:WallpaperImage_];
+            }
         }
 
-        NSString *html = [theme stringByAppendingPathComponent:@"Wallpaper.html"];
-        if ([Manager_ fileExistsAtPath:html]) {
+        if ([path hasSuffix:@".html"]) {
             CGRect bounds = [indirect bounds];
 
             UIWebDocumentView *view([[[UIWebDocumentView alloc] initWithFrame:bounds] autorelease]);
             [view setAutoresizes:true];
 
             WallpaperPage_ = [view retain];
-            WallpaperURL_ = [[NSURL fileURLWithPath:html] retain];
+            WallpaperURL_ = [[NSURL fileURLWithPath:path] retain];
 
             [WallpaperPage_ loadRequest:[NSURLRequest requestWithURL:WallpaperURL_]];
 
@@ -940,8 +891,8 @@ MSHook(id, SBUIController$init, SBUIController *self, SEL sel) {
         }
     }
 
-    for (size_t i(0), e([themes_ count]); i != e; ++i) {
-        NSString *theme = [themes_ objectAtIndex:(e - i - 1)];
+    for (size_t i(0), e([Themes_ count]); i != e; ++i) {
+        NSString *theme = [Themes_ objectAtIndex:(e - i - 1)];
         NSString *html = [theme stringByAppendingPathComponent:@"Widget.html"];
         if ([Manager_ fileExistsAtPath:html]) {
             CGRect bounds = [indirect bounds];
@@ -963,6 +914,7 @@ MSHook(id, SBUIController$init, SBUIController *self, SEL sel) {
 
     return self;
 }
+// }}}
 
 MSHook(void, SBAwayView$updateDesktopImage$, SBAwayView *self, SEL sel, UIImage *image) {
     NSString *path = $getTheme$([NSArray arrayWithObject:@"LockBackground.html"]);
@@ -1095,20 +1047,21 @@ WBDelegate(badge_)
 @end
 /* }}} */
 
-MSHook(void, SBIconView$setIconImageAlpha$, SBIconView *self, SEL sel, float alpha) {
+// IconAlpha {{{
+MSInstanceMessageHook1(void, SBIcon, setIconImageAlpha, float, alpha) {
     if (NSNumber *number = [Info_ objectForKey:@"IconAlpha"])
         alpha = [number floatValue];
-    return _SBIconView$setIconImageAlpha$(self, sel, alpha);
+    return MSOldCall(alpha);
 }
 
-MSHook(void, SBIconView$setIconLabelAlpha$, SBIconView *self, SEL sel, float alpha) {
+MSInstanceMessageHook1(void, SBIcon, setIconLabelAlpha, float, alpha) {
     if (NSNumber *number = [Info_ objectForKey:@"IconAlpha"])
         alpha = [number floatValue];
-    return _SBIconView$setIconLabelAlpha$(self, sel, alpha);
+    return MSOldCall(alpha);
 }
 
-MSHook(id, SBIconView$initWithDefaultSize, SBIconView *self, SEL sel) {
-    if ((self = _SBIconView$initWithDefaultSize(self, sel)) != nil) {
+MSInstanceMessageHook0(id, SBIcon, initWithDefaultSize) {
+    if ((self = MSOldCall()) != nil) {
         if (NSNumber *number = [Info_ objectForKey:@"IconAlpha"]) {
             // XXX: note: this is overridden above, which is silly
             float alpha([number floatValue]);
@@ -1118,11 +1071,12 @@ MSHook(id, SBIconView$initWithDefaultSize, SBIconView *self, SEL sel) {
     } return self;
 }
 
-MSHook(void, SBIcon$setAlpha$, SBIcon *self, SEL sel, float alpha) {
+MSInstanceMessageHook1(void, SBIcon, setAlpha, float, alpha) {
     if (NSNumber *number = [Info_ objectForKey:@"IconAlpha"])
         alpha = [number floatValue];
-    return _SBIcon$setAlpha$(self, sel, alpha);
+    return MSOldCall(alpha);
 }
+// }}}
 
 MSHook(id, SBIconBadge$initWithBadge$, SBIconBadge *self, SEL sel, NSString *badge) {
     if ((self = _SBIconBadge$initWithBadge$(self, sel, badge)) != nil) {
@@ -1295,7 +1249,8 @@ MSHook(void, SBDockIconListView$setFrame$, id self, SEL sel, CGRect frame) {
     _SBDockIconListView$setFrame$(self, sel, frame);
 }
 
-MSHook(NSString *, NSBundle$localizedStringForKey$value$table$, NSBundle *self, SEL sel, NSString *key, NSString *value, NSString *table) {
+// %hook -[NSBundle localizedStringForKey:value:table:] {{{
+MSInstanceMessageHook3(NSString *, NSBundle, localizedStringForKey,value,table, NSString *, key, NSString *, value, NSString *, table) {
     NSString *identifier = [self bundleIdentifier];
     NSLocale *locale = [NSLocale currentLocale];
     NSString *language = [locale objectForKey:NSLocaleLanguageCode];
@@ -1317,18 +1272,21 @@ MSHook(NSString *, NSBundle$localizedStringForKey$value$table$, NSBundle *self, 
         } else goto null;
     } else null:
         [Strings_ setObject:[NSNull null] forKey:name];
-    return _NSBundle$localizedStringForKey$value$table$(self, sel, key, value, table);
+    return MSOldCall(key, value, table);
 }
+// }}}
+// %hook -[WebCoreFrameBridge renderedSizeOfNode:constrainedToWidth:] {{{
+MSClassHook(WebCoreFrameBridge)
 
-@class WebCoreFrameBridge;
-MSHook(CGSize, WebCoreFrameBridge$renderedSizeOfNode$constrainedToWidth$, WebCoreFrameBridge *self, SEL sel, id node, float width) {
+MSInstanceMessageHook2(CGSize, WebCoreFrameBridge, renderedSizeOfNode,constrainedToWidth, id, node, float, width) {
     if (node == nil)
         return CGSizeZero;
     void **core(reinterpret_cast<void **>([node _node]));
     if (core == NULL || core[6] == NULL)
         return CGSizeZero;
-    return _WebCoreFrameBridge$renderedSizeOfNode$constrainedToWidth$(self, sel, node, width);
+    return MSOldCall(node, width);
 }
+// }}}
 
 MSHook(void, SBIconLabel$drawRect$, SBIconLabel *self, SEL sel, CGRect rect) {
     CGRect bounds = [self bounds];
@@ -1383,37 +1341,37 @@ MSHook(void, SBIconLabel$drawRect$, SBIconLabel *self, SEL sel, CGRect rect) {
     [label drawAtPoint:CGPointMake((bounds.size.width - size.width) / 2, 0) withStyle:style];
 }
 
-MSHook(void, CKMessageCell$addBalloonView$, id self, SEL sel, CKBalloonView *balloon) {
-    _CKMessageCell$addBalloonView$(self, sel, balloon);
+// ChatKit {{{
+MSInstanceMessageHook1(void, CKMessageCell, addBalloonView, CKBalloonView *, balloon) {
+    MSOldCall(balloon);
     [balloon setBackgroundColor:[UIColor clearColor]];
 }
 
-MSHook(id, CKMessageCell$initWithStyle$reuseIdentifier$, id self, SEL sel, int style, NSString *reuse) {
-    if ((self = _CKMessageCell$initWithStyle$reuseIdentifier$(self, sel, style, reuse)) != nil) {
+MSInstanceMessageHook2(id, CKMessageCell, initWithStyle,reuseIdentifier, int, style, NSString *, reuse) {
+    if ((self = MSOldCall(style, reuse)) != nil) {
         [[self contentView] setBackgroundColor:[UIColor clearColor]];
     } return self;
 }
 
-MSHook(id, CKTimestampView$initWithStyle$reuseIdentifier$, id self, SEL sel, int style, NSString *reuse) {
-    if ((self = _CKTimestampView$initWithStyle$reuseIdentifier$(self, sel, style, reuse)) != nil) {
+MSInstanceMessageHook2(id, CKTimestampView, initWithStyle,reuseIdentifier, int, style, NSString *, reuse) {
+    if ((self = MSOldCall(style, reuse)) != nil) {
         UILabel *&_label(MSHookIvar<UILabel *>(self, "_label"));
         [_label setBackgroundColor:[UIColor clearColor]];
     } return self;
 }
 
-MSHook(void, CKTranscriptTableView$setSeparatorStyle$, id self, SEL sel, int style) {
-    _CKTranscriptTableView$setSeparatorStyle$(self, sel, UITableViewCellSeparatorStyleNone);
+MSInstanceMessageHook1(void, CKTranscriptTableView, setSeparatorStyle, int, style) {
+    MSOldCall(UITableViewCellSeparatorStyleNone);
 }
 
-MSHook(id, CKTranscriptTableView$initWithFrame$style$, id self, SEL sel, CGRect frame, int style) {
-    _trace();
-    if ((self = _CKTranscriptTableView$initWithFrame$style$(self, sel, frame, style)) != nil) {
+MSInstanceMessageHook2(id, CKTranscriptTableView, initWithFrame,style, CGRect, frame, int, style) {
+    if ((self = MSOldCall(frame, style)) != nil) {
         [self setSeparatorStyle:UITableViewCellSeparatorStyleNone];
     } return self;
 }
 
-MSHook(void, TranscriptController$loadView, mSMSMessageTranscriptController *self, SEL sel) {
-    _TranscriptController$loadView(self, sel);
+MSInstanceMessageHook0(void, CKTranscriptController, loadView) {
+    MSOldCall();
 
     if (NSString *path = $getTheme$([NSArray arrayWithObjects:@"SMSBackground.png", @"SMSBackground.jpg", nil]))
         if (UIImage *image = [[UIImage alloc] initWithContentsOfFile:path]) {
@@ -1440,7 +1398,9 @@ MSHook(void, TranscriptController$loadView, mSMSMessageTranscriptController *sel
             }
         }
 }
+// }}}
 
+// %hook _UIImageWithName() {{{
 MSHook(UIImage *, _UIImageWithName, NSString *name) {
     if (Debug_)
         NSLog(@"WB:Debug: _UIImageWithName(\"%@\")", name);
@@ -1479,7 +1439,8 @@ MSHook(UIImage *, _UIImageWithName, NSString *name) {
         return image == nil ? __UIImageWithName(name) : image;
     }
 }
-
+// }}}
+// %hook _UIImageWithNameInDomain() {{{
 MSHook(UIImage *, _UIImageWithNameInDomain, NSString *name, NSString *domain) {
     NSString *key([NSString stringWithFormat:@"D:%zu%@%@", [domain length], domain, name]);
     UIImage *image([PathImages_ objectForKey:key]);
@@ -1487,7 +1448,7 @@ MSHook(UIImage *, _UIImageWithNameInDomain, NSString *name, NSString *domain) {
         return reinterpret_cast<id>(image) == [NSNull null] ? __UIImageWithNameInDomain(name, domain) : image;
     if (Debug_)
         NSLog(@"WB:Debug: UIImageWithNameInDomain(\"%@\", \"%@\")", name, domain);
-    if (NSString *path = $getTheme$([NSArray arrayWithObject:[NSString stringWithFormat:@"Domains/%@/%@", domain, name]])) {
+    if (NSString *path = $getTheme$([NSArray arrayWithObject:[NSString stringWithFormat:@"Domains/%@/%@", domain, name]], true)) {
         image = [[UIImage alloc] initWithContentsOfFile:path];
         if (image != nil)
             [image autorelease];
@@ -1495,7 +1456,9 @@ MSHook(UIImage *, _UIImageWithNameInDomain, NSString *name, NSString *domain) {
     [PathImages_ setObject:(image == nil ? [NSNull null] : reinterpret_cast<id>(image)) forKey:key];
     return image == nil ? __UIImageWithNameInDomain(name, domain) : image;
 }
+// }}}
 
+// %hook GSFontCreateWithName() {{{
 MSHook(GSFontRef, GSFontCreateWithName, const char *name, GSFontSymbolicTraits traits, float size) {
     if (Debug_)
         NSLog(@"WB:Debug: GSFontCreateWithName(\"%s\", %f)", name, size);
@@ -1505,6 +1468,7 @@ MSHook(GSFontRef, GSFontCreateWithName, const char *name, GSFontSymbolicTraits t
     //    size *= [scale floatValue];
     return _GSFontCreateWithName(name, traits, size);
 }
+// }}}
 
 #define AudioToolbox "/System/Library/Frameworks/AudioToolbox.framework/AudioToolbox"
 #define UIKit "/System/Library/Frameworks/UIKit.framework/UIKit"
@@ -1522,7 +1486,7 @@ MSHook(bool, _Z24GetFileNameForThisActionmPcRb, unsigned long a0, char *a1, bool
         NSString *path = [NSString stringWithUTF8String:a1];
         if ([path hasPrefix:@"/System/Library/Audio/UISounds/"]) {
             NSString *file = [path substringFromIndex:31];
-            for (NSString *theme in themes_) {
+            for (NSString *theme in Themes_) {
                 NSString *path([NSString stringWithFormat:@"%@/UISounds/%@", theme, file]);
                 if ([Manager_ fileExistsAtPath:path]) {
                     strcpy(a1, [path UTF8String]);
@@ -1562,6 +1526,11 @@ static void ChangeWallpaper(
     _ ## name ## $ ## imp = MSHookMessage($ ## name, @selector(sel), &$ ## name ## $ ## imp)
 
 template <typename Type_>
+static void msset(Type_ &function, MSImageRef image, const char *name) {
+    function = reinterpret_cast<Type_>(MSFindSymbol(image, name));
+}
+
+template <typename Type_>
 static void nlset(Type_ &function, struct nlist *nl, size_t index) {
     struct nlist &name(nl[index]);
     uintptr_t value(name.n_value);
@@ -1575,101 +1544,85 @@ static void dlset(Type_ &function, const char *name) {
     function = reinterpret_cast<Type_>(dlsym(RTLD_DEFAULT, name));
 }
 
-/*static void WBImage(const struct mach_header* mh, intptr_t vmaddr_slide) {
-    uint32_t count(_dyld_image_count());
-    for (uint32_t index(0); index != count; ++index)
-        if (_dyld_get_image_header(index) == mh) {
-            CGImageSourceRef (*CGImageSourceCreateWithURL)(CFURLRef url, CFDictionaryRef options);
-            dlset(CGImageSourceCreateWithURL, "CGImageSourceCreateWithURL");
-            MSHookFunction(&CGImageSourceCreateWithURL, &$CGImageSourceCreateWithURL, &_CGImageSourceCreateWithURL);
-        }
-}*/
+// %hook CGImageReadCreateWithFile() {{{
+MSHook(void *, CGImageReadCreateWithFile, NSString *path, int flag) {
+    if (Debug_)
+        NSLog(@"WB:Debug: CGImageReadCreateWithFile(%@, %d)", path, flag);
+    NSAutoreleasePool *pool([[NSAutoreleasePool alloc] init]);
+    void *value(_CGImageReadCreateWithFile([path wb$themedPath], flag));
+    [pool release];
+    return value;
+}
+// }}}
 
-extern "C" void WBInitialize() {
+static void SBInitialize() {
+    _UIImage$defaultDesktopImage = MSHookMessage(object_getClass($UIImage), @selector(defaultDesktopImage), &$UIImage$defaultDesktopImage);
+
+    bool olden(dlsym(RTLD_DEFAULT, "GSLibraryCopyGenerationInfoValueForKey") == NULL);
+
+    if (SummerBoard_) {
+        WBRename(SBApplication, pathForIcon, pathForIcon);
+        WBRename(SBApplicationIcon, icon, icon);
+        WBRename(SBApplicationIcon, generateIconImage:, generateIconImage$);
+    }
+
+    WBRename(SBBookmarkIcon, icon, icon);
+    WBRename(SBButtonBar, didMoveToSuperview, didMoveToSuperview);
+    WBRename(SBCalendarIconContentsView, drawRect:, drawRect$);
+    WBRename(SBIconBadge, initWithBadge:, initWithBadge$);
+    WBRename(SBIconController, noteNumberOfIconListsChanged, noteNumberOfIconListsChanged);
+
+    WBRename(SBWidgetApplicationIcon, icon, icon);
+
+    WBRename(SBDockIconListView, setFrame:, setFrame$);
+    MSHookMessage(object_getClass($SBDockIconListView), @selector(shouldShowNewDock), &$SBDockIconListView$shouldShowNewDock, &_SBDockIconListView$shouldShowNewDock);
+
+    if (olden)
+        WBRename(SBIconLabel, drawRect:, drawRect$);
+
+    WBRename(SBIconLabel, initWithSize:label:, initWithSize$label$);
+    WBRename(SBIconLabel, setInDock:, setInDock$);
+
+    WBRename(SBIconList, setFrame:, setFrame$);
+
+    WBRename(SBIconModel, cacheImageForIcon:, cacheImageForIcon$);
+    WBRename(SBIconModel, cacheImagesForIcon:, cacheImagesForIcon$);
+    WBRename(SBIconModel, getCachedImagedForIcon:, getCachedImagedForIcon$);
+    WBRename(SBIconModel, getCachedImagedForIcon:smallIcon:, getCachedImagedForIcon$smallIcon$);
+
+    WBRename(SBSearchView, initWithFrame:, initWithFrame$);
+    WBRename(SBSearchTableViewCell, drawRect:, drawRect$);
+    WBRename(SBSearchTableViewCell, initWithStyle:reuseIdentifier:, initWithStyle$reuseIdentifier$);
+
+    //WBRename(SBImageCache, initWithName:forImageWidth:imageHeight:initialCapacity:, initWithName$forImageWidth$imageHeight$initialCapacity$);
+
+    WBRename(SBAwayView, updateDesktopImage:, updateDesktopImage$);
+    WBRename(SBStatusBarContentsView, didMoveToSuperview, didMoveToSuperview);
+    //WBRename(SBStatusBarContentsView, initWithStatusBar:mode:, initWithStatusBar$mode$);
+    //WBRename(SBStatusBarController, setStatusBarMode:orientation:duration:animation:, setStatusBarMode$orientation$duration$animation$);
+    WBRename(SBStatusBarController, setStatusBarMode:orientation:duration:fenceID:animation:, setStatusBarMode$orientation$duration$fenceID$animation$);
+    WBRename(SBStatusBarController, setStatusBarMode:orientation:duration:fenceID:animation:startTime:, setStatusBarMode$orientation$duration$fenceID$animation$startTime$);
+    WBRename(SBStatusBarOperatorNameView, operatorNameStyle, operatorNameStyle);
+    WBRename(SBStatusBarOperatorNameView, setOperatorName:fullSize:, setOperatorName$fullSize$);
+    WBRename(SBStatusBarTimeView, drawRect:, drawRect$);
+
+    if (SummerBoard_)
+        English_ = [[NSDictionary alloc] initWithContentsOfFile:@"/System/Library/CoreServices/SpringBoard.app/English.lproj/LocalizedApplicationNames.strings"];
+}
+
+MSInitialize {
     NSAutoreleasePool *pool([[NSAutoreleasePool alloc] init]);
 
     NSString *identifier([[NSBundle mainBundle] bundleIdentifier]);
+    SpringBoard_ = [identifier isEqualToString:@"com.apple.springboard"];
 
-    NSLog(@"WB:Notice: WinterBoard");
+    Manager_ = [[NSFileManager defaultManager] retain];
+    Themes_ = [[NSMutableArray alloc] initWithCapacity:8];
 
     dlset(_GSFontGetUseLegacyFontMetrics, "GSFontGetUseLegacyFontMetrics");
 
-    //if ([NSBundle bundleWithIdentifier:@"com.apple.ImageIO.framework"] != nil)
-        MSHookFunction(&CGImageSourceCreateWithURL, &$CGImageSourceCreateWithURL, &_CGImageSourceCreateWithURL);
-    //else
-    //    _dyld_register_func_for_add_image(&WBImage);
-
-    struct nlist nl[8];
-
-    if ([NSBundle bundleWithIdentifier:@"com.apple.UIKit"] != nil) {
-// UIKit {{{
-        memset(nl, 0, sizeof(nl));
-        nl[0].n_un.n_name = (char *) "__UIApplicationImageWithName";
-        nl[1].n_un.n_name = (char *) "__UIImageAtPath";
-        nl[2].n_un.n_name = (char *) "__UIImageRefAtPath";
-        nl[3].n_un.n_name = (char *) "__UIImageWithNameInDomain";
-        nl[4].n_un.n_name = (char *) "__UIKitBundle";
-        nl[5].n_un.n_name = (char *) "__UIPackedImageTableGetIdentifierForName";
-        nl[6].n_un.n_name = (char *) "__UISharedImageNameGetIdentifier";
-        nlist(UIKit, nl);
-
-        nlset(_UIApplicationImageWithName, nl, 0);
-        nlset(_UIImageAtPath, nl, 1);
-        nlset(_UIImageRefAtPath, nl, 2);
-        nlset(_UIImageWithNameInDomain, nl, 3);
-        nlset(_UIKitBundle, nl, 4);
-        nlset(_UIPackedImageTableGetIdentifierForName, nl, 5);
-        nlset(_UISharedImageNameGetIdentifier, nl, 6);
-
-        MSHookFunction(_UIApplicationImageWithName, &$_UIApplicationImageWithName, &__UIApplicationImageWithName);
-        MSHookFunction(_UIImageAtPath, &$_UIImageAtPath, &__UIImageAtPath);
-        MSHookFunction(_UIImageRefAtPath, &$_UIImageRefAtPath, &__UIImageRefAtPath);
-        MSHookFunction(_UIImageWithName, &$_UIImageWithName, &__UIImageWithName);
-        MSHookFunction(_UIImageWithNameInDomain, &$_UIImageWithNameInDomain, &__UIImageWithNameInDomain);
-// }}}
-    }
-
-    MSHookFunction(&GSFontCreateWithName, &$GSFontCreateWithName, &_GSFontCreateWithName);
-
-    if (dlopen(AudioToolbox, RTLD_LAZY | RTLD_NOLOAD) != NULL) {
-// AudioToolbox {{{
-        struct nlist nl[2];
-        memset(nl, 0, sizeof(nl));
-        nl[0].n_un.n_name = (char *) "__Z24GetFileNameForThisActionmPcRb";
-        nlist(AudioToolbox, nl);
-        nlset(_Z24GetFileNameForThisActionmPcRb, nl, 0);
-        MSHookFunction(_Z24GetFileNameForThisActionmPcRb, &$_Z24GetFileNameForThisActionmPcRb, &__Z24GetFileNameForThisActionmPcRb);
-// }}}
-    }
-
-    $NSBundle = objc_getClass("NSBundle");
-
-    _NSBundle$localizedStringForKey$value$table$ = MSHookMessage($NSBundle, @selector(localizedStringForKey:value:table:), &$NSBundle$localizedStringForKey$value$table$);
-    _NSBundle$pathForResource$ofType$ = MSHookMessage($NSBundle, @selector(pathForResource:ofType:), &$NSBundle$pathForResource$ofType$);
-
-    $UIImage = objc_getClass("UIImage");
-    $UINavigationBar = objc_getClass("UINavigationBar");
-    $UIToolbar = objc_getClass("UIToolbar");
-
-    _UIImage$defaultDesktopImage = MSHookMessage(object_getClass($UIImage), @selector(defaultDesktopImage), &$UIImage$defaultDesktopImage);
-
-    //WBRename("UINavigationBar", @selector(initWithCoder:), (IMP) &UINavigationBar$initWithCoder$);
-    //WBRename("UINavigationBarBackground", @selector(initWithFrame:withBarStyle:withTintColor:), (IMP) &UINavigationBarBackground$initWithFrame$withBarStyle$withTintColor$);
-
-    _UINavigationBar$setBarStyle$ = MSHookMessage($UINavigationBar, @selector(setBarStyle:), &$UINavigationBar$setBarStyle$);
-    _UIToolbar$setBarStyle$ = MSHookMessage($UIToolbar, @selector(setBarStyle:), &$UIToolbar$setBarStyle$);
-
-    Manager_ = [[NSFileManager defaultManager] retain];
-    UIImages_ = [[NSMutableDictionary alloc] initWithCapacity:16];
-    PathImages_ = [[NSMutableDictionary alloc] initWithCapacity:16];
-    Strings_ = [[NSMutableDictionary alloc] initWithCapacity:0];
-    Bundles_ = [[NSMutableDictionary alloc] initWithCapacity:2];
-    Themed_ = [[NSMutableDictionary alloc] initWithCapacity:128];
-
-    themes_ = [[NSMutableArray alloc] initWithCapacity:8];
-
+    // Load Settings.plist {{{
     if (NSDictionary *settings = [NSDictionary dictionaryWithContentsOfFile:[NSString stringWithFormat:@"/User/Library/Preferences/com.saurik.WinterBoard.plist"]]) {
-// Load Settings {{{
         if (NSNumber *value = [settings objectForKey:@"SummerBoard"])
             SummerBoard_ = [value boolValue];
         if (NSNumber *value = [settings objectForKey:@"Debug"])
@@ -1699,7 +1652,7 @@ extern "C" void WBInitialize() {
                     if (theme == nil) { \
                         NSString *path = [NSString stringWithFormat:format]; \
                         if ([Manager_ fileExistsAtPath:path]) { \
-                            [themes_ addObject:path]; \
+                            [Themes_ addObject:path]; \
                             continue; \
                         } \
                     }
@@ -1709,51 +1662,41 @@ extern "C" void WBInitialize() {
                 testForTheme(@"%@/Library/SummerBoard/Themes/%@", NSHomeDirectory(), name)
 
             }
-// }}}
     }
-
+    // }}}
+    // Merge Info.plist {{{
     Info_ = [[NSMutableDictionary dictionaryWithCapacity:16] retain];
 
-    for (NSString *theme in themes_)
+    for (NSString *theme in Themes_)
         if (NSDictionary *info = [NSDictionary dictionaryWithContentsOfFile:[NSString stringWithFormat:@"%@/Info.plist", theme]])
             for (NSString *key in [info allKeys])
                 if ([Info_ objectForKey:key] == nil)
                     [Info_ setObject:[info objectForKey:key] forKey:key];
+    // }}}
 
-    bool sms($getTheme$([NSArray arrayWithObjects:@"SMSBackground.png", @"SMSBackground.jpg", nil]) != nil);
+    // AudioToolbox {{{
+    if (MSImageRef image = MSGetImageByName(AudioToolbox)) {
+        msset(_Z24GetFileNameForThisActionmPcRb, image, "__Z24GetFileNameForThisActionmPcRb");
+        MSHookFunction(_Z24GetFileNameForThisActionmPcRb, &$_Z24GetFileNameForThisActionmPcRb, &__Z24GetFileNameForThisActionmPcRb);
+    }
+    // }}}
+    // GraphicsServices {{{
+    if (true) {
+        MSHookFunction(&GSFontCreateWithName, &$GSFontCreateWithName, &_GSFontCreateWithName);
+    }
+    // }}}
+    // ImageIO {{{
+    if (MSImageRef image = MSGetImageByName("/System/Library/Frameworks/ImageIO.framework/ImageIO")) {
+        void *(*CGImageReadCreateWithFile)(NSString *, int);
+        msset(CGImageReadCreateWithFile, image, "_CGImageReadCreateWithFile");
+        MSHookFunction(CGImageReadCreateWithFile, MSHake(CGImageReadCreateWithFile));
+    }
+    // }}}
+    // SpringBoard {{{
+    if (SpringBoard_) {
+        Wallpapers_ = [[NSArray arrayWithObjects:@"Wallpaper.mp4", @"Wallpaper.png", @"Wallpaper.jpg", @"Wallpaper.html", nil] retain];
+        Docked_ = $getTheme$([NSArray arrayWithObjects:@"Dock.png", nil]);
 
-    SpringBoard_ = [identifier isEqualToString:@"com.apple.springboard"];
-
-    if ([NSBundle bundleWithIdentifier:@"com.apple.chatkit"] != nil)
-// ChatKit {{{
-        if (sms) {
-            $CKMessageCell = objc_getClass("CKMessageCell");
-            _CKMessageCell$addBalloonView$ = MSHookMessage($CKMessageCell, @selector(addBalloonView:), &$CKMessageCell$addBalloonView$);
-            _CKMessageCell$initWithStyle$reuseIdentifier$ = MSHookMessage($CKMessageCell, @selector(initWithStyle:reuseIdentifier:), &$CKMessageCell$initWithStyle$reuseIdentifier$);
-
-            $CKTranscriptTableView = objc_getClass("CKTranscriptTableView");
-            _CKTranscriptTableView$setSeparatorStyle$ = MSHookMessage($CKTranscriptTableView, @selector(setSeparatorStyle:), &$CKTranscriptTableView$setSeparatorStyle$);
-            _CKTranscriptTableView$initWithFrame$style$ = MSHookMessage($CKTranscriptTableView, @selector(initWithFrame:style:), &$CKTranscriptTableView$initWithFrame$style$);
-
-            $CKTimestampView = objc_getClass("CKTimestampView");
-            _CKTimestampView$initWithStyle$reuseIdentifier$ = MSHookMessage($CKTimestampView, @selector(initWithStyle:reuseIdentifier:), &$CKTimestampView$initWithStyle$reuseIdentifier$);
-
-            $CKTranscriptController = objc_getClass("CKTranscriptController");
-            _TranscriptController$loadView = MSHookMessage($CKTranscriptController, @selector(loadView), &$TranscriptController$loadView);
-        }
-// }}}
-
-    if ([identifier isEqualToString:@"com.apple.MobileSMS"]) {
-// MobileSMS {{{
-        if (sms) {
-            if (_TranscriptController$loadView == NULL) {
-                Class mSMSMessageTranscriptController = objc_getClass("mSMSMessageTranscriptController");
-                _TranscriptController$loadView = MSHookMessage(mSMSMessageTranscriptController, @selector(loadView), &$TranscriptController$loadView);
-            }
-        }
-// }}}
-    } else if (SpringBoard_) {
-// SpringBoard {{{
         CFNotificationCenterAddObserver(
             CFNotificationCenterGetDarwinNotifyCenter(),
             NULL, &ChangeWallpaper, (CFStringRef) @"com.saurik.winterboard.lockbackground", NULL, 0
@@ -1768,104 +1711,31 @@ extern "C" void WBInitialize() {
             $MPVideoView = objc_getClass("MPVideoView");
         }
 
-        $WebCoreFrameBridge = objc_getClass("WebCoreFrameBridge");
-
-        bool olden(dlsym(RTLD_DEFAULT, "GSLibraryCopyGenerationInfoValueForKey") == NULL);
-
-        if (olden)
-            $SBCalendarIconContentsView = objc_getClass("SBCalendarIconContentsView");
-
-        $SBApplication = objc_getClass("SBApplication");
-        $SBApplicationIcon = objc_getClass("SBApplicationIcon");
-        $SBAwayView = objc_getClass("SBAwayView");
-        $SBBookmarkIcon = objc_getClass("SBBookmarkIcon");
-        $SBButtonBar = objc_getClass("SBButtonBar");
-        $SBDockIconListView = objc_getClass("SBDockIconListView");
-        $SBIcon = objc_getClass("SBIcon");
-        $SBIconBadge = objc_getClass("SBIconBadge");
-        $SBIconController = objc_getClass("SBIconController");
-        $SBIconLabel = objc_getClass("SBIconLabel");
-        $SBIconList = objc_getClass("SBIconList");
-        $SBIconModel = objc_getClass("SBIconModel");
-        $SBIconView = objc_getClass("SBIconView");
-        //$SBImageCache = objc_getClass("SBImageCache");
-        $SBSearchView = objc_getClass("SBSearchView");
-        $SBSearchTableViewCell = objc_getClass("SBSearchTableViewCell");
-        $SBStatusBarContentsView = objc_getClass("SBStatusBarContentsView");
-        $SBStatusBarController = objc_getClass("SBStatusBarController");
-        $SBStatusBarOperatorNameView = objc_getClass("SBStatusBarOperatorNameView");
-        $SBStatusBarTimeView = objc_getClass("SBStatusBarTimeView");
-        $SBUIController = objc_getClass("SBUIController");
-        $SBWidgetApplicationIcon = objc_getClass("SBWidgetApplicationIcon");
-
-        if ($SBIconView == nil)
-            $SBIconView = $SBIcon;
-
-        Four_ = $SBDockIconListView != nil;
-
-        WBRename(WebCoreFrameBridge, renderedSizeOfNode:constrainedToWidth:, renderedSizeOfNode$constrainedToWidth$);
-
-        if (SummerBoard_) {
-            WBRename(SBApplication, pathForIcon, pathForIcon);
-            WBRename(SBApplicationIcon, icon, icon);
-            WBRename(SBApplicationIcon, generateIconImage:, generateIconImage$);
-        }
-
-        WBRename(SBBookmarkIcon, icon, icon);
-        WBRename(SBButtonBar, didMoveToSuperview, didMoveToSuperview);
-        WBRename(SBCalendarIconContentsView, drawRect:, drawRect$);
-        WBRename(SBIcon, setAlpha:, setAlpha$);
-        WBRename(SBIconBadge, initWithBadge:, initWithBadge$);
-        WBRename(SBIconController, noteNumberOfIconListsChanged, noteNumberOfIconListsChanged);
-        WBRename(SBIconView, initWithDefaultSize, initWithDefaultSize);
-        WBRename(SBIconView, setIconImageAlpha:, setIconImageAlpha$);
-        WBRename(SBIconView, setIconLabelAlpha:, setIconLabelAlpha$);
-        WBRename(SBUIController, init, init);
-        WBRename(SBWidgetApplicationIcon, icon, icon);
-
-        WBRename(SBDockIconListView, setFrame:, setFrame$);
-        MSHookMessage(object_getClass($SBDockIconListView), @selector(shouldShowNewDock), &$SBDockIconListView$shouldShowNewDock, &_SBDockIconListView$shouldShowNewDock);
-
-        if (olden)
-            WBRename(SBIconLabel, drawRect:, drawRect$);
-
-        WBRename(SBIconLabel, initWithSize:label:, initWithSize$label$);
-        WBRename(SBIconLabel, setInDock:, setInDock$);
-
-        WBRename(SBIconList, setFrame:, setFrame$);
-
-        WBRename(SBIconModel, cacheImageForIcon:, cacheImageForIcon$);
-        WBRename(SBIconModel, cacheImagesForIcon:, cacheImagesForIcon$);
-        WBRename(SBIconModel, getCachedImagedForIcon:, getCachedImagedForIcon$);
-        WBRename(SBIconModel, getCachedImagedForIcon:smallIcon:, getCachedImagedForIcon$smallIcon$);
-
-        WBRename(SBSearchView, initWithFrame:, initWithFrame$);
-        WBRename(SBSearchTableViewCell, drawRect:, drawRect$);
-        WBRename(SBSearchTableViewCell, initWithStyle:reuseIdentifier:, initWithStyle$reuseIdentifier$);
-
-        //WBRename(SBImageCache, initWithName:forImageWidth:imageHeight:initialCapacity:, initWithName$forImageWidth$imageHeight$initialCapacity$);
-
-        WBRename(SBAwayView, updateDesktopImage:, updateDesktopImage$);
-        WBRename(SBStatusBarContentsView, didMoveToSuperview, didMoveToSuperview);
-        //WBRename(SBStatusBarContentsView, initWithStatusBar:mode:, initWithStatusBar$mode$);
-        //WBRename(SBStatusBarController, setStatusBarMode:orientation:duration:animation:, setStatusBarMode$orientation$duration$animation$);
-        WBRename(SBStatusBarController, setStatusBarMode:orientation:duration:fenceID:animation:, setStatusBarMode$orientation$duration$fenceID$animation$);
-        WBRename(SBStatusBarController, setStatusBarMode:orientation:duration:fenceID:animation:startTime:, setStatusBarMode$orientation$duration$fenceID$animation$startTime$);
-        WBRename(SBStatusBarOperatorNameView, operatorNameStyle, operatorNameStyle);
-        WBRename(SBStatusBarOperatorNameView, setOperatorName:fullSize:, setOperatorName$fullSize$);
-        WBRename(SBStatusBarTimeView, drawRect:, drawRect$);
-
-        if (SummerBoard_)
-            English_ = [[NSDictionary alloc] initWithContentsOfFile:@"/System/Library/CoreServices/SpringBoard.app/English.lproj/LocalizedApplicationNames.strings"];
-
-        Cache_ = [[NSMutableDictionary alloc] initWithCapacity:64];
-// }}}
+        SBInitialize();
     }
+    // }}}
+    // UIKit {{{
+    if ([NSBundle bundleWithIdentifier:@"com.apple.UIKit"] != nil) {
+        struct nlist nl[6];
+        memset(nl, 0, sizeof(nl));
+        nl[0].n_un.n_name = (char *) "__UIApplicationImageWithName";
+        nl[1].n_un.n_name = (char *) "__UIImageWithNameInDomain";
+        nl[2].n_un.n_name = (char *) "__UIKitBundle";
+        nl[3].n_un.n_name = (char *) "__UIPackedImageTableGetIdentifierForName";
+        nl[4].n_un.n_name = (char *) "__UISharedImageNameGetIdentifier";
+        nlist(UIKit, nl);
 
-    Wallpapers_ = [[NSArray arrayWithObjects:@"Wallpaper.mp4", @"Wallpaper.png", @"Wallpaper.jpg", @"Wallpaper.html", nil] retain];
-    Papered_ = $getTheme$(Wallpapers_) != nil;
+        nlset(_UIApplicationImageWithName, nl, 0);
+        nlset(_UIImageWithNameInDomain, nl, 1);
+        nlset(_UIKitBundle, nl, 2);
+        nlset(_UIPackedImageTableGetIdentifierForName, nl, 3);
+        nlset(_UISharedImageNameGetIdentifier, nl, 4);
 
-    Docked_ = $getTheme$([NSArray arrayWithObjects:@"Dock.png", nil]);
+        MSHookFunction(_UIApplicationImageWithName, &$_UIApplicationImageWithName, &__UIApplicationImageWithName);
+        MSHookFunction(_UIImageWithName, &$_UIImageWithName, &__UIImageWithName);
+        MSHookFunction(_UIImageWithNameInDomain, &$_UIImageWithNameInDomain, &__UIImageWithNameInDomain);
+    }
+    // }}}
 
     [pool release];
 }
