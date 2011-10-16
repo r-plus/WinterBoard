@@ -246,6 +246,12 @@ static NSString *$getTheme$(NSArray *files, bool rescale = false) {
 
     for (NSString *theme in Themes_)
         for (NSString *file in files) {
+            if (rescale && /*$getScale$(file) == 1 &&*/ Scale_ == 2) {
+                path = [NSString stringWithFormat:@"%@/%@@2x.%@", theme, [file stringByDeletingPathExtension], [file pathExtension]];
+                if ([Manager_ fileExistsAtPath:path])
+                    goto set;
+            }
+
             path = [NSString stringWithFormat:@"%@/%@", theme, file];
             if ([Manager_ fileExistsAtPath:path])
                 goto set;
