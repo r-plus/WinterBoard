@@ -212,6 +212,21 @@ static NSMutableDictionary *Themed_ = [[NSMutableDictionary alloc] initWithCapac
 
 static unsigned Scale_ = 0;
 
+static unsigned $getScale$(NSString *path) {
+    NSString *name(path);
+
+    #define StripName(strip) \
+        if ([name hasSuffix:@ strip]) \
+            name = [name substringWithRange:NSMakeRange(0, [name length] - sizeof(strip) - 1)];
+
+    StripName(".png");
+    StripName(".jpg");
+    StripName("~iphone");
+    StripName("~ipad");
+
+    return [name hasSuffix:@"@2x"] ? 2 : 1;
+}
+
 static NSString *$getTheme$(NSArray *files, bool rescale = false) {
     if (NSString *path = [Themed_ objectForKey:files])
         return reinterpret_cast<id>(path) == [NSNull null] ? nil : path;
@@ -716,21 +731,9 @@ static NSURL *WallpaperURL_;
     } while (false)
 
 static UIImage *$getImage$(NSString *path) {
-    NSString *name(path);
-
-    #define StripName(strip) \
-        if ([name hasSuffix:@ strip]) \
-            name = [name substringWithRange:NSMakeRange(0, [name length] - sizeof(strip) - 1)];
-
-    StripName(".png");
-    StripName(".jpg");
-    StripName("~iphone");
-    StripName("~ipad");
-
-    unsigned scale([name hasSuffix:@"@2x"] ? 2 : 1);
-
     UIImage *image([UIImage imageWithContentsOfFile:path]);
 
+    unsigned scale($getScale$(path));
     if (scale != 1 && [image respondsToSelector:@selector(setScale)])
         [image setScale:scale];
 
