@@ -383,6 +383,9 @@ static NSString *$pathForIcon$(SBApplication *self, NSString *suffix = @"") {
 @implementation NSString (WinterBoard)
 
 - (NSString *) wb$themedPath {
+    if ([self hasPrefix:@"/Library/Themes/"])
+        return self;
+
     if (Debug_)
         NSLog(@"WB:Debug:Bypass(\"%@\")", self);
 
