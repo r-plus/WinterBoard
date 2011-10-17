@@ -1445,11 +1445,8 @@ MSHook(UIImage *, _UIImageWithName, NSString *name) {
         UIImage *image([UIImages_ objectForKey:key]);
         if (image != nil)
             return reinterpret_cast<id>(image) == [NSNull null] ? __UIImageWithName(name) : image;
-        if (NSString *path = $pathForFile$inBundle$(name, _UIKitBundle(), true)) {
-            image = [[UIImage alloc] initWithContentsOfFile:path cache:true];
-            if (image != nil)
-                [image autorelease];
-        }
+        if (NSString *path = $pathForFile$inBundle$(name, _UIKitBundle(), true))
+            image = $getImage$(path);
         [UIImages_ setObject:(image == nil ? [NSNull null] : reinterpret_cast<id>(image)) forKey:key];
         return image == nil ? __UIImageWithName(name) : image;
     }
@@ -1463,11 +1460,8 @@ MSHook(UIImage *, _UIImageWithNameInDomain, NSString *name, NSString *domain) {
         return reinterpret_cast<id>(image) == [NSNull null] ? __UIImageWithNameInDomain(name, domain) : image;
     if (Debug_)
         NSLog(@"WB:Debug: UIImageWithNameInDomain(\"%@\", \"%@\")", name, domain);
-    if (NSString *path = $getTheme$([NSArray arrayWithObject:[NSString stringWithFormat:@"Domains/%@/%@", domain, name]], true)) {
-        image = [[UIImage alloc] initWithContentsOfFile:path];
-        if (image != nil)
-            [image autorelease];
-    }
+    if (NSString *path = $getTheme$([NSArray arrayWithObject:[NSString stringWithFormat:@"Domains/%@/%@", domain, name]], true))
+        image = $getImage$(path);
     [PathImages_ setObject:(image == nil ? [NSNull null] : reinterpret_cast<id>(image)) forKey:key];
     return image == nil ? __UIImageWithNameInDomain(name, domain) : image;
 }
