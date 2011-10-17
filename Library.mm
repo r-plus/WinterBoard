@@ -103,6 +103,8 @@ bool _itv;
 
 #include <sys/sysctl.h>
 
+#include "WBMarkup.h"
+
 extern "C" void __clear_cache (char *beg, char *end);
 
 @protocol WinterBoard

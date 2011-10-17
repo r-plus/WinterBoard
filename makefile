@@ -15,8 +15,8 @@ WinterBoardSettings: Settings.mm makefile
 	$(target)g++ -dynamiclib -g0 -O2 -Wall -o $@ $(filter %.mm,$^) -framework UIKit -framework CoreFoundation -framework Foundation -lobjc -framework CoreGraphics -framework Preferences -F$(PKG_ROOT)/System/Library/PrivateFrameworks
 	ldid -S $@
 
-WinterBoard.dylib: Library.mm makefile ../mobilesubstrate/substrate.h
-	$(target)g++ -dynamiclib -g0 -O2 -Wall -o $@ $(filter %.mm,$^) -framework CoreFoundation -framework Foundation -lobjc -I/apl/inc/iPhoneOS-2.0 -framework CoreGraphics -framework ImageIO -framework GraphicsServices -framework Celestial $(substrate) -framework UIKit -F$(PKG_ROOT)/System/Library/PrivateFrameworks
+WinterBoard.dylib: Library.mm WBMarkup.mm WBMarkup.h makefile ../mobilesubstrate/substrate.h
+	$(target)g++ -dynamiclib -g0 -O2 -Wall -o $@ $(filter %.mm,$^) -framework CoreFoundation -framework Foundation -lobjc -I/apl/inc/iPhoneOS-2.0 -framework CoreGraphics -framework ImageIO -framework GraphicsServices -framework Celestial $(substrate) -framework UIKit -framework WebCore -framework WebKit -F$(PKG_ROOT)/System/Library/PrivateFrameworks
 	ldid -S $@
 
 UIImages: UIImages.mm makefile
