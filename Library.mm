@@ -115,6 +115,7 @@ Class $MPMoviePlayerController;
 Class $MPVideoView;
 
 MSClassHook(NSBundle)
+MSClassHook(NSString)
 
 MSClassHook(UIImage)
 MSClassHook(UINavigationBar)
@@ -1302,7 +1303,7 @@ MSInstanceMessageHook2(CGSize, WebCoreFrameBridge, renderedSizeOfNode,constraine
 }
 // }}}
 
-MSHook(void, SBIconLabel$drawRect$, SBIconLabel *self, SEL sel, CGRect rect) {
+MSInstanceMessageHook1(void, SBIconLabel, drawRect, CGRect, rect) {
     CGRect bounds = [self bounds];
 
     static Ivar drawMoreLegibly = object_getInstanceVariable(self, "_drawMoreLegibly", NULL);
@@ -1569,10 +1570,26 @@ MSHook(void *, CGImageReadCreateWithFile, NSString *path, int flag) {
 }
 // }}}
 
-static void SBInitialize() {
-    _UIImage$defaultDesktopImage = MSHookMessage(object_getClass($UIImage), @selector(defaultDesktopImage), &$UIImage$defaultDesktopImage);
+extern "C" void WKSetCurrentGraphicsContext(CGContextRef);
 
-    bool olden(dlsym(RTLD_DEFAULT, "GSLibraryCopyGenerationInfoValueForKey") == NULL);
+static void NSString$drawAtPoint$withStyle$(NSString *self, SEL _cmd, CGPoint point, NSString *style) {
+    WKSetCurrentGraphicsContext(UIGraphicsGetCurrentContext());
+    if (style == nil || [style length] == 0)
+        style = @"font-family: Helvetica; font-size: 12px";
+    return [[WBMarkup sharedMarkup] drawString:self atPoint:point withStyle:style];
+}
+
+static CGSize NSString$sizeWithStyle$forWidth$(NSString *self, SEL _cmd, NSString *style, float width) {
+    if (style == nil || [style length] == 0)
+        style = @"font-family: Helvetica; font-size: 12px";
+    return [[WBMarkup sharedMarkup] sizeOfString:self withStyle:style forWidth:width];
+}
+
+static void SBInitialize() {
+    class_addMethod($NSString, @selector(drawAtPoint:withStyle:), (IMP) &NSString$drawAtPoint$withStyle$, "v20@0:4{CGPoint=ff}8@16");
+    class_addMethod($NSString, @selector(sizeWithStyle:forWidth:), (IMP) &NSString$sizeWithStyle$forWidth$, "{CGSize=ff}16@0:4@8f12");
+
+    _UIImage$defaultDesktopImage = MSHookMessage(object_getClass($UIImage), @selector(defaultDesktopImage), &$UIImage$defaultDesktopImage);
 
     if (SummerBoard_) {
         WBRename(SBApplication, pathForIcon, pathForIcon);
@@ -1590,9 +1607,6 @@ static void SBInitialize() {
 
     WBRename(SBDockIconListView, setFrame:, setFrame$);
     MSHookMessage(object_getClass($SBDockIconListView), @selector(shouldShowNewDock), &$SBDockIconListView$shouldShowNewDock, &_SBDockIconListView$shouldShowNewDock);
-
-    if (olden)
-        WBRename(SBIconLabel, drawRect:, drawRect$);
 
     WBRename(SBIconLabel, initWithSize:label:, initWithSize$label$);
     WBRename(SBIconLabel, setInDock:, setInDock$);
