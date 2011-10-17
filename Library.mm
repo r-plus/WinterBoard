@@ -255,7 +255,7 @@ static NSArray *$useScale$(NSArray *files, bool use = true) {
     return scaled;
 }
 
-static NSString *$getTheme$(NSArray *files) {
+static NSString *$getTheme$(NSArray *files, NSArray *themes = Themes_) {
     if (NSString *path = [Themed_ objectForKey:files])
         return reinterpret_cast<id>(path) == [NSNull null] ? nil : path;
 
@@ -770,6 +770,8 @@ MSInstanceMessageHook0(id, SBUIController, init) {
         return nil;
 
     NSString *paper($getTheme$(Wallpapers_));
+    if (paper != nil)
+        paper = [paper stringByDeletingLastPathComponent];
 
     {
         size_t size;
@@ -851,8 +853,10 @@ MSInstanceMessageHook0(id, SBUIController, init) {
     _release(WallpaperPage_);
     _release(WallpaperURL_);
 
-    if (NSString *path = paper) {
-        if ([path hasSuffix:@".mp4"]) {
+    if (paper != nil) {
+        NSArray *themes([NSArray arrayWithObject:paper]);
+
+        if (NSString *path = $getTheme$([NSArray arrayWithObject:@"Wallpaper.mp4"], themes)) {
 #if UseAVController
             NSError *error;
 
@@ -887,7 +891,7 @@ MSInstanceMessageHook0(id, SBUIController, init) {
             [indirect addSubview:video];
         }
 
-        if ([path hasSuffix:@".png"] || [path hasSuffix:@".jpg"]) {
+        if (NSString *path = $getTheme$([NSArray arrayWithObjects:@"Wallpaper@2x.png", @"Wallpaper@2x.jpg", @"Wallpaper.png", @"Wallpaper.jpg", nil], themes)) {
             if (UIImage *image = $getImage$(path)) {
                 WallpaperFile_ = [path retain];
                 WallpaperImage_ = [[UIImageView alloc] initWithImage:image];
@@ -897,7 +901,7 @@ MSInstanceMessageHook0(id, SBUIController, init) {
             }
         }
 
-        if ([path hasSuffix:@".html"]) {
+        if (NSString *path = $getTheme$([NSArray arrayWithObject:@"Wallpaper@.html"], themes)) {
             CGRect bounds = [indirect bounds];
 
             UIWebDocumentView *view([[[UIWebDocumentView alloc] initWithFrame:bounds] autorelease]);
