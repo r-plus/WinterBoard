@@ -230,17 +230,34 @@ static unsigned $getScale$(NSString *path) {
     return [name hasSuffix:@"@2x"] ? 2 : 1;
 }
 
-static NSString *$getTheme$(NSArray *files, bool rescale = false) {
-    if (NSString *path = [Themed_ objectForKey:files])
-        return reinterpret_cast<id>(path) == [NSNull null] ? nil : path;
+static NSArray *$useScale$(NSArray *files, bool use = true) {
+    if (!use)
+        return files;
 
-    if (rescale && Scale_ == 0) {
+    if (Scale_ == 0) {
         UIScreen *screen([UIScreen mainScreen]);
         if ([screen respondsToSelector:@selector(scale)])
             Scale_ = [screen scale];
         else
             Scale_ = 1;
     }
+
+    if (Scale_ == 1)
+        return files;
+
+    NSMutableArray *scaled([NSMutableArray arrayWithCapacity:([files count] * 2)]);
+
+    for (NSString *file in files) {
+        [scaled addObject:[NSString stringWithFormat:@"%@@2x.%@", [file stringByDeletingPathExtension], [file pathExtension]]];
+        [scaled addObject:file];
+    }
+
+    return scaled;
+}
+
+static NSString *$getTheme$(NSArray *files) {
+    if (NSString *path = [Themed_ objectForKey:files])
+        return reinterpret_cast<id>(path) == [NSNull null] ? nil : path;
 
     if (Debug_)
         NSLog(@"WB:Debug: %@", [files description]);
@@ -249,12 +266,6 @@ static NSString *$getTheme$(NSArray *files, bool rescale = false) {
 
     for (NSString *theme in Themes_)
         for (NSString *file in files) {
-            if (rescale && /*$getScale$(file) == 1 &&*/ Scale_ == 2) {
-                path = [NSString stringWithFormat:@"%@/%@@2x.%@", theme, [file stringByDeletingPathExtension], [file pathExtension]];
-                if ([Manager_ fileExistsAtPath:path])
-                    goto set;
-            }
-
             path = [NSString stringWithFormat:@"%@/%@", theme, file];
             if ([Manager_ fileExistsAtPath:path])
                 goto set;
@@ -295,7 +306,7 @@ static NSString *$pathForFile$inBundle$(NSString *file, NSBundle *bundle, bool u
         remapResourceName(Four_ ? @"SBDockBG-old.png" : @"SBDockBG.png", @"Dock")
         remapResourceName(@"SBWeatherCelsius.png", @"Icons/Weather")
 
-    if (NSString *path = $getTheme$(names, ui))
+    if (NSString *path = $getTheme$($useScale$(names, ui)))
         return path;
 
     return nil;
@@ -758,7 +769,7 @@ MSInstanceMessageHook0(id, SBUIController, init) {
     if (self == nil)
         return nil;
 
-    NSString *paper($getTheme$(Wallpapers_, true));
+    NSString *paper($getTheme$(Wallpapers_));
 
     {
         size_t size;
@@ -1460,7 +1471,7 @@ MSHook(UIImage *, _UIImageWithNameInDomain, NSString *name, NSString *domain) {
         return reinterpret_cast<id>(image) == [NSNull null] ? __UIImageWithNameInDomain(name, domain) : image;
     if (Debug_)
         NSLog(@"WB:Debug: UIImageWithNameInDomain(\"%@\", \"%@\")", name, domain);
-    if (NSString *path = $getTheme$([NSArray arrayWithObject:[NSString stringWithFormat:@"Domains/%@/%@", domain, name]], true))
+    if (NSString *path = $getTheme$($useScale$([NSArray arrayWithObject:[NSString stringWithFormat:@"Domains/%@/%@", domain, name]])))
         image = $getImage$(path);
     [PathImages_ setObject:(image == nil ? [NSNull null] : reinterpret_cast<id>(image)) forKey:key];
     return image == nil ? __UIImageWithNameInDomain(name, domain) : image;
@@ -1716,7 +1727,7 @@ MSInitialize {
     // }}}
     // SpringBoard {{{
     if (SpringBoard_) {
-        Wallpapers_ = [[NSArray arrayWithObjects:@"Wallpaper.mp4", @"Wallpaper.png", @"Wallpaper.jpg", @"Wallpaper.html", nil] retain];
+        Wallpapers_ = [[NSArray arrayWithObjects:@"Wallpaper.mp4", @"Wallpaper@2x.png", @"Wallpaper@2x.jpg", @"Wallpaper.png", @"Wallpaper.jpg", @"Wallpaper.html", nil] retain];
         Docked_ = $getTheme$([NSArray arrayWithObjects:@"Dock.png", nil]);
 
         CFNotificationCenterAddObserver(
