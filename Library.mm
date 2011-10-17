@@ -891,7 +891,7 @@ MSInstanceMessageHook0(id, SBUIController, init) {
             [indirect addSubview:video];
         }
 
-        if (NSString *path = $getTheme$([NSArray arrayWithObjects:@"Wallpaper@2x.png", @"Wallpaper@2x.jpg", @"Wallpaper.png", @"Wallpaper.jpg", nil], themes)) {
+        if (NSString *path = $getTheme$($useScale$([NSArray arrayWithObjects:@"Wallpaper.png", @"Wallpaper.jpg", nil]), themes)) {
             if (UIImage *image = $getImage$(path)) {
                 WallpaperFile_ = [path retain];
                 WallpaperImage_ = [[UIImageView alloc] initWithImage:image];
@@ -901,7 +901,7 @@ MSInstanceMessageHook0(id, SBUIController, init) {
             }
         }
 
-        if (NSString *path = $getTheme$([NSArray arrayWithObject:@"Wallpaper@.html"], themes)) {
+        if (NSString *path = $getTheme$([NSArray arrayWithObject:@"Wallpaper.html"], themes)) {
             CGRect bounds = [indirect bounds];
 
             UIWebDocumentView *view([[[UIWebDocumentView alloc] initWithFrame:bounds] autorelease]);
