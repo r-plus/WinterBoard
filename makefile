@@ -45,6 +45,7 @@ package: all
 	cp -a WinterBoardSettings.plist winterboard/Library/PreferenceLoader/Preferences
 	cp -a WinterBoardSettings.bundle winterboard/System/Library/PreferenceBundles
 	cp -a Icon-Small.png winterboard/System/Library/PreferenceBundles/WinterBoardSettings.bundle/icon.png
+	cp -a Icon-Small@2x.png winterboard/System/Library/PreferenceBundles/WinterBoardSettings.bundle/icon@2x.png
 	cp -a SearchResultsCheckmarkClear.png WinterBoardSettings winterboard/System/Library/PreferenceBundles/WinterBoardSettings.bundle
 	ln -s /Applications/WinterBoard.app/WinterBoard.dylib winterboard/Library/MobileSubstrate/DynamicLibraries
 	cp -a WinterBoard.plist winterboard/Library/MobileSubstrate/DynamicLibraries
