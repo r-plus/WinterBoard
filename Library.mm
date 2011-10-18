@@ -131,10 +131,12 @@ MSClassHook(SBApplicationIcon)
 MSClassHook(SBAwayView)
 MSClassHook(SBBookmarkIcon)
 MSClassHook(SBButtonBar)
+MSClassHook(SBCalendarApplicationIcon)
 MSClassHook(SBCalendarIconContentsView)
 MSClassHook(SBDockIconListView)
 MSClassHook(SBIcon)
 MSClassHook(SBIconBadge)
+MSClassHook(SBIconBadgeFactory)
 MSClassHook(SBIconController)
 MSClassHook(SBIconLabel)
 MSClassHook(SBIconList)
@@ -148,6 +150,8 @@ MSClassHook(SBStatusBarOperatorNameView)
 MSClassHook(SBStatusBarTimeView)
 MSClassHook(SBUIController)
 MSClassHook(SBWidgetApplicationIcon)
+
+extern "C" void WKSetCurrentGraphicsContext(CGContextRef);
 
 __attribute__((__constructor__))
 static void MSFixClass() {
@@ -623,6 +627,83 @@ MSInstanceMessageHook2(NSString *, NSBundle, pathForResource,ofType, NSString *,
     return MSOldCall(resource, type);
 }
 // }}}
+
+static struct WBStringDrawingState {
+    WBStringDrawingState *next_;
+    NSString *extra_;
+    NSString *key_;
+} *stringDrawingState_;
+
+MSInstanceMessageHook4(CGSize, NSString, drawAtPoint,forWidth,withFont,lineBreakMode, CGPoint, point, float, width, UIFont *, font, int, mode) {
+    if (stringDrawingState_ == NULL)
+        return MSOldCall(point, width, font, mode);
+
+    NSString *style([[font markupDescription] stringByAppendingString:@";"]);
+
+    if (NSString *extra = stringDrawingState_->extra_)
+        style = [style stringByAppendingString:extra];
+
+    if (stringDrawingState_->key_ != nil)
+        if (NSString *extra = [Info_ objectForKey:stringDrawingState_->key_])
+            style = [style stringByAppendingString:extra];
+
+    stringDrawingState_ = stringDrawingState_->next_;
+
+    WKSetCurrentGraphicsContext(UIGraphicsGetCurrentContext());
+    [[WBMarkup sharedMarkup] drawString:self atPoint:point withStyle:style];
+    return CGSizeZero;
+}
+
+MSInstanceMessageHook2(CGSize, NSString, drawAtPoint,withFont, CGPoint, point, UIFont *, font) {
+    if (stringDrawingState_ == NULL)
+        return MSOldCall(point, font);
+
+    NSString *style([[font markupDescription] stringByAppendingString:@";"]);
+
+    if (NSString *extra = stringDrawingState_->extra_)
+        style = [style stringByAppendingString:extra];
+
+    if (stringDrawingState_->key_ != nil)
+        if (NSString *extra = [Info_ objectForKey:stringDrawingState_->key_])
+            style = [style stringByAppendingString:extra];
+
+    stringDrawingState_ = stringDrawingState_->next_;
+
+    WKSetCurrentGraphicsContext(UIGraphicsGetCurrentContext());
+    [[WBMarkup sharedMarkup] drawString:self atPoint:point withStyle:style];
+    return CGSizeZero;
+}
+
+MSInstanceMessageHook1(UIImage *, SBIconBadgeFactory, checkoutBadgeImageForText, NSString *, text) {
+    WBStringDrawingState badgeState = {NULL, @""
+        "color: white;"
+    , @"BadgeStyle"};
+
+    stringDrawingState_ = &badgeState;
+
+    UIImage *image(MSOldCall(text));
+
+    stringDrawingState_ = NULL;
+    return image;
+}
+
+MSInstanceMessageHook1(UIImage *, SBCalendarApplicationIcon, generateIconImage, int, type) {
+    WBStringDrawingState dayState = {NULL, @""
+        "color: white;"
+        "text-shadow: rgba(0, 0, 0, 0.2) -1px -1px 2px;"
+    , @"CalendarIconDayStyle"};
+
+    WBStringDrawingState dateState = {&dayState, @""
+        "color: #333333;"
+    , @"CalendarIconDateStyle"};
+
+    stringDrawingState_ = &dateState;
+
+    UIImage *image(MSOldCall(type));
+
+    stringDrawingState_ = NULL;
+    return image;
+}
 
 MSHook(void, SBCalendarIconContentsView$drawRect$, SBCalendarIconContentsView *self, SEL sel, CGRect rect) {
     NSBundle *bundle([NSBundle mainBundle]);
@@ -1578,8 +1659,6 @@ MSHook(void *, CGImageReadCreateWithFile, NSString *path, int flag) {
     return value;
 }
 // }}}
-
-extern "C" void WKSetCurrentGraphicsContext(CGContextRef);
 
 static void NSString$drawAtPoint$withStyle$(NSString *self, SEL _cmd, CGPoint point, NSString *style) {
     WKSetCurrentGraphicsContext(UIGraphicsGetCurrentContext());
