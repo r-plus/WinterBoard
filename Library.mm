@@ -649,8 +649,7 @@ MSInstanceMessageHook4(CGSize, NSString, drawAtPoint,forWidth,withFont,lineBreak
 
     stringDrawingState_ = stringDrawingState_->next_;
 
-    WKSetCurrentGraphicsContext(UIGraphicsGetCurrentContext());
-    [[WBMarkup sharedMarkup] drawString:self atPoint:point withStyle:style];
+    [self drawAtPoint:point withStyle:style];
     return CGSizeZero;
 }
 
@@ -669,8 +668,7 @@ MSInstanceMessageHook2(CGSize, NSString, drawAtPoint,withFont, CGPoint, point, U
 
     stringDrawingState_ = stringDrawingState_->next_;
 
-    WKSetCurrentGraphicsContext(UIGraphicsGetCurrentContext());
-    [[WBMarkup sharedMarkup] drawString:self atPoint:point withStyle:style];
+    [self drawAtPoint:point withStyle:style];
     return CGSizeZero;
 }
 
