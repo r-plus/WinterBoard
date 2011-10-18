@@ -1,2 +1,8 @@
 WinterBoard
 debs
+WinterBoard.dylib
+WinterBoardSettings
+*.deb
+Optimize
+UIImages
+winterboard
