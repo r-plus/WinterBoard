@@ -1482,10 +1482,8 @@ MSInstanceMessageHook2(id, CKTranscriptTableView, initWithFrame,style, CGRect, f
 MSInstanceMessageHook0(void, CKTranscriptController, loadView) {
     MSOldCall();
 
-    if (NSString *path = $getTheme$([NSArray arrayWithObjects:@"SMSBackground.png", @"SMSBackground.jpg", nil]))
-        if (UIImage *image = [[UIImage alloc] initWithContentsOfFile:path]) {
-            [image autorelease];
-
+    if (NSString *path = $getTheme$($useScale$([NSArray arrayWithObjects:@"SMSBackground.png", @"SMSBackground.jpg", nil])))
+        if (UIImage *image = $getImage$(path)) {
             UIView *&_transcriptTable(MSHookIvar<UIView *>(self, "_transcriptTable"));
             UIView *&_transcriptLayer(MSHookIvar<UIView *>(self, "_transcriptLayer"));
             UIView *table;
