@@ -3,6 +3,6 @@
 <plist version="1.0"><dict>
 
 <key>UndockedIconLabelStyle</key>
-<string>color: transparent</string>
+<string>opacity: 0</string>
 
 </dict></plist>
