@@ -1458,6 +1458,7 @@ MSInstanceMessageHook1(void, CKMessageCell, addBalloonView, CKBalloonView *, bal
 
 MSInstanceMessageHook2(id, CKMessageCell, initWithStyle,reuseIdentifier, int, style, NSString *, reuse) {
     if ((self = MSOldCall(style, reuse)) != nil) {
+        [self setBackgroundColor:[UIColor clearColor]];
         [[self contentView] setBackgroundColor:[UIColor clearColor]];
     } return self;
 }
