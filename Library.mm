@@ -123,6 +123,7 @@ MSClassHook(UIToolbar)
 
 MSClassHook(CKMessageCell)
 MSClassHook(CKTimestampView)
+MSClassHook(CKTranscriptCell)
 MSClassHook(CKTranscriptController)
 MSClassHook(CKTranscriptTableView)
 
@@ -1454,6 +1455,13 @@ MSInstanceMessageHook1(void, SBIconLabel, drawRect, CGRect, rect) {
 MSInstanceMessageHook1(void, CKMessageCell, addBalloonView, CKBalloonView *, balloon) {
     MSOldCall(balloon);
     [balloon setBackgroundColor:[UIColor clearColor]];
+}
+
+MSInstanceMessageHook2(id, CKTranscriptCell, initWithStyle,reuseIdentifier, int, style, NSString *, reuse) {
+    if ((self = MSOldCall(style, reuse)) != nil) {
+        [self setBackgroundColor:[UIColor clearColor]];
+        [[self contentView] setBackgroundColor:[UIColor clearColor]];
+    } return self;
 }
 
 MSInstanceMessageHook2(id, CKMessageCell, initWithStyle,reuseIdentifier, int, style, NSString *, reuse) {
