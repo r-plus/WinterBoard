@@ -164,6 +164,52 @@
 				</dict>
 			</array>
 		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>footerText</key>
+			<string>All UIImages that are not themed will be saved as PNGs into /tmp/UIImages.</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<false/>
+			<key>key</key>
+			<string>RecordUI</string>
+			<key>label</key>
+			<string>Record UIImages</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>isStaticText</key>
+			<string>true</string>
+			<key>requiredCapabilities</key>
+			<array>
+				<dict>
+					<key>wildcat</key>
+					<false/>
+					<key>voip</key>
+					<false/>
+				</dict>
+			</array>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSTitleValueCell</string>
+			<key>label</key>
+			<string>All UIImages that are not themed will be saved as PNGs into /tmp/UIImages.</string>
+			<key>requiredCapabilities</key>
+			<array>
+				<dict>
+					<key>wildcat</key>
+					<false/>
+					<key>voip</key>
+					<false/>
+				</dict>
+			</array>
+		</dict>
 	</array>
 	<key>title</key>
 	<string>WinterBoard</string>

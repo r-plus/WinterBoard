@@ -1836,6 +1836,8 @@ MSInitialize {
             SummerBoard_ = [value boolValue];
         if (NSNumber *value = [settings objectForKey:@"Debug"])
             Debug_ = [value boolValue];
+        if (NSNumber *value = [settings objectForKey:@"RecordUI"])
+            UIDebug_ = [value boolValue];
 
         NSArray *themes([settings objectForKey:@"Themes"]);
         if (themes == nil)
@@ -1946,8 +1948,13 @@ MSInitialize {
     }
     // }}}
 
-    if (Debug_ && [Manager_ fileExistsAtPath:@"/tmp/UIImages"])
-        UIDebug_ = true;
+    if (UIDebug_ && ![Manager_ fileExistsAtPath:@"/tmp/UIImages"]) {
+        NSError *error(nil);
+        if (![Manager_ createDirectoryAtPath:@"/tmp/UIImages" withIntermediateDirectories:NO attributes:[NSDictionary dictionaryWithObjectsAndKeys:
+            [NSNumber numberWithShort:0777], NSFilePosixPermissions,
+        nil] error:&error])
+            NSLog(@"WB:Error: cannot create /tmp/UIImages (%@)", error);
+    }
 
     [pool release];
 }
