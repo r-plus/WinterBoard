@@ -1389,9 +1389,12 @@ MSHook(void, SBIconLabel$setInDock$, SBIconLabel *self, SEL sel, BOOL docked) {
     id &_label(MSHookIvar<id>(self, "_label"));
     if (![Info_ wb$boolForKey:@"UndockedIconLabels"])
         docked = true;
+
     if (_label != nil && [_label respondsToSelector:@selector(setInDock:)])
         [_label setInDock:docked];
-    return _SBIconLabel$setInDock$(self, sel, docked);
+
+    _SBIconLabel$setInDock$(self, sel, docked);
+    [self setNeedsDisplay];
 }
 
 MSHook(BOOL, SBDockIconListView$shouldShowNewDock, id self, SEL sel) {
