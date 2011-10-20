@@ -1417,7 +1417,7 @@ MSInstanceMessageHook1(void, SBIconLabel, drawRect, CGRect, rect) {
         style = [style stringByAppendingString:@"text-shadow: rgba(0, 0, 0, 0.5) 0px -1px 0px; "];
 
     bool ellipsis(false);
-    float max = 75, width;
+    float max = [self frame].size.width - 11, width;
   width:
     width = [(ellipsis ? [label stringByAppendingString:@"..."] : label) sizeWithStyle:style forWidth:320].width;
 
