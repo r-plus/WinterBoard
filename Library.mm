@@ -661,42 +661,69 @@ MSInstanceMessageHook2(NSString *, NSBundle, pathForResource,ofType, NSString *,
 
 static struct WBStringDrawingState {
     WBStringDrawingState *next_;
+    unsigned count_;
     NSString *base_;
     NSString *info_;
 } *stringDrawingState_;
 
 MSInstanceMessageHook4(CGSize, NSString, drawAtPoint,forWidth,withFont,lineBreakMode, CGPoint, point, float, width, UIFont *, font, int, mode) {
-    if (stringDrawingState_ == NULL || stringDrawingState_->info_ == nil)
+    WBStringDrawingState *state(stringDrawingState_);
+    if (state == NULL)
         return MSOldCall(point, width, font, mode);
 
-    NSString *info([Info_ objectForKey:stringDrawingState_->info_]);
+    if (--state->count_ == 0)
+        stringDrawingState_ = state->next_;
+    if (state->info_ == nil)
+        return MSOldCall(point, width, font, mode);
+
+    NSString *info([Info_ objectForKey:state->info_]);
     if (info == nil)
         return MSOldCall(point, width, font, mode);
 
-    NSString *base(stringDrawingState_->base_ ?: @"");
-    stringDrawingState_ = stringDrawingState_->next_;
-
+    NSString *base(state->base_ ?: @"");
     [self drawAtPoint:point withStyle:[NSString stringWithFormat:@"%@;%@;%@", [font markupDescription], base, info]];
     return CGSizeZero;
 }
 
 MSInstanceMessageHook2(CGSize, NSString, drawAtPoint,withFont, CGPoint, point, UIFont *, font) {
-    if (stringDrawingState_ == NULL || stringDrawingState_->info_ == nil)
+    WBStringDrawingState *state(stringDrawingState_);
+    if (state == NULL)
         return MSOldCall(point, font);
 
-    NSString *info([Info_ objectForKey:stringDrawingState_->info_]);
+    if (--state->count_ == 0)
+        stringDrawingState_ = state->next_;
+    if (state->info_ == nil)
+        return MSOldCall(point, font);
+
+    NSString *info([Info_ objectForKey:state->info_]);
     if (info == nil)
         return MSOldCall(point, font);
 
-    NSString *base(stringDrawingState_->base_ ?: @"");
-    stringDrawingState_ = stringDrawingState_->next_;
-
+    NSString *base(state->base_ ?: @"");
     [self drawAtPoint:point withStyle:[NSString stringWithFormat:@"%@;%@;%@", [font markupDescription], base, info]];
     return CGSizeZero;
 }
 
+MSInstanceMessageHook1(CGSize, NSString, sizeWithFont, UIFont *, font) {
+    WBStringDrawingState *state(stringDrawingState_);
+    if (state == NULL)
+        return MSOldCall(font);
+
+    if (--state->count_ == 0)
+        stringDrawingState_ = state->next_;
+    if (state->info_ == nil)
+        return MSOldCall(font);
+
+    NSString *info([Info_ objectForKey:state->info_]);
+    if (info == nil)
+        return MSOldCall(font);
+
+    NSString *base(state->base_ ?: @"");
+    return [self sizeWithStyle:[NSString stringWithFormat:@"%@;%@;%@", [font markupDescription], base, info] forWidth:65535];
+}
+
 MSInstanceMessageHook1(UIImage *, SBIconBadgeFactory, checkoutBadgeImageForText, NSString *, text) {
-    WBStringDrawingState badgeState = {NULL, @""
+    WBStringDrawingState badgeState = {NULL, 1, @""
         "color: white;"
     , @"BadgeStyle"};
 
@@ -709,13 +736,15 @@ MSInstanceMessageHook1(UIImage *, SBIconBadgeFactory, checkoutBadgeImageForText,
 }
 
 MSInstanceMessageHook1(UIImage *, SBCalendarApplicationIcon, generateIconImage, int, type) {
-    WBStringDrawingState dayState = {NULL, @""
+    WBStringDrawingState dayState = {NULL, 2, @""
         "color: white;"
         // XXX: this is only correct on an iPod dock
         "text-shadow: rgba(0, 0, 0, 0.2) -1px -1px 2px;"
     , @"CalendarIconDayStyle"};
 
-    WBStringDrawingState dateState = {&dayState, @""
+    WBStringDrawingState sizeState = {&dayState, 7, nil, nil};
+
+    WBStringDrawingState dateState = {&sizeState, 2, @""
         "color: #333333;"
     , @"CalendarIconDateStyle"};
 
