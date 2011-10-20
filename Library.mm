@@ -118,6 +118,7 @@ MSClassHook(NSBundle)
 MSClassHook(NSString)
 
 MSClassHook(UIImage)
+MSMetaClassHook(UIImage)
 MSClassHook(UINavigationBar)
 MSClassHook(UIToolbar)
 
@@ -145,11 +146,13 @@ MSClassHook(SBIconModel)
 //MSClassHook(SBImageCache)
 MSClassHook(SBSearchView)
 MSClassHook(SBSearchTableViewCell)
+MSClassHook(SBSlidingAlertDisplay)
 MSClassHook(SBStatusBarContentsView)
 MSClassHook(SBStatusBarController)
 MSClassHook(SBStatusBarOperatorNameView)
 MSClassHook(SBStatusBarTimeView)
 MSClassHook(SBUIController)
+MSClassHook(SBWallpaperView)
 MSClassHook(SBWidgetApplicationIcon)
 
 extern "C" void WKSetCurrentGraphicsContext(CGContextRef);
@@ -831,14 +834,6 @@ MSHook(void, SBStatusBarContentsView$didMoveToSuperview, UIView *self, SEL sel) 
     _SBStatusBarContentsView$didMoveToSuperview(self, sel);
 }
 
-MSHook(UIImage *, UIImage$defaultDesktopImage, UIImage *self, SEL sel) {
-    if (Debug_)
-        NSLog(@"WB:Debug:DefaultDesktopImage");
-    if (NSString *path = $getTheme$([NSArray arrayWithObjects:@"LockBackground.png", @"LockBackground.jpg", nil]))
-        return [UIImage imageWithContentsOfFile:path];
-    return _UIImage$defaultDesktopImage(self, sel);
-}
-
 static NSArray *Wallpapers_;
 static bool Papered_;
 static bool Docked_;
@@ -861,6 +856,34 @@ static UIImage *$getImage$(NSString *path) {
         [image setScale:scale];
 
     return image;
+}
+
+static UIImage *$getDefaultDesktopImage$() {
+    if (NSString *path = $getTheme$($useScale$([NSArray arrayWithObjects:@"LockBackground.png", @"LockBackground.jpg", nil])))
+        return $getImage$(path);
+    return nil;
+}
+
+MSClassMessageHook0(UIImage *, UIImage, defaultDesktopImage) {
+    return $getDefaultDesktopImage$() ?: MSOldCall();
+}
+
+MSInstanceMessageHook0(UIImage *, SBSlidingAlertDisplay, _defaultDesktopImage) {
+    return $getDefaultDesktopImage$() ?: MSOldCall();
+}
+
+MSInstanceMessageHook0(void, SBWallpaperView, resetCurrentImageToWallpaper) {
+    for (UIView *parent([self superview]); parent != nil; parent = [parent superview])
+        if ([parent isKindOfClass:$SBSlidingAlertDisplay]) {
+            if (UIImage *image = $getDefaultDesktopImage$()) {
+                [self setImage:image];
+                return;
+            }
+
+            break;
+        }
+
+    MSOldCall();
 }
 
 // %hook -[SBUIController init] {{{
@@ -1716,8 +1739,6 @@ static CGSize NSString$sizeWithStyle$forWidth$(NSString *self, SEL _cmd, NSStrin
 static void SBInitialize() {
     class_addMethod($NSString, @selector(drawAtPoint:withStyle:), (IMP) &NSString$drawAtPoint$withStyle$, "v20@0:4{CGPoint=ff}8@16");
     class_addMethod($NSString, @selector(sizeWithStyle:forWidth:), (IMP) &NSString$sizeWithStyle$forWidth$, "{CGSize=ff}16@0:4@8f12");
-
-    _UIImage$defaultDesktopImage = MSHookMessage(object_getClass($UIImage), @selector(defaultDesktopImage), &$UIImage$defaultDesktopImage);
 
     if (SummerBoard_) {
         WBRename(SBApplication, pathForIcon, pathForIcon);
