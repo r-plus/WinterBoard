@@ -237,9 +237,6 @@ static unsigned $getScale$(NSString *path) {
 }
 
 static NSArray *$useScale$(NSArray *files, bool use = true) {
-    if (!use)
-        return files;
-
     if (Scale_ == 0) {
         UIScreen *screen([UIScreen mainScreen]);
         if ([screen respondsToSelector:@selector(scale)])
@@ -254,7 +251,10 @@ static NSArray *$useScale$(NSArray *files, bool use = true) {
     NSMutableArray *scaled([NSMutableArray arrayWithCapacity:([files count] * 2)]);
 
     for (NSString *file in files) {
-        [scaled addObject:[NSString stringWithFormat:@"%@@2x.%@", [file stringByDeletingPathExtension], [file pathExtension]]];
+        if (use && Scale_ == 2)
+            [scaled addObject:[NSString stringWithFormat:@"%@@2x.%@", [file stringByDeletingPathExtension], [file pathExtension]]];
+        if ([file hasSuffix:@"@2x~iphone.png"])
+            [scaled addObject:[[file substringWithRange:NSMakeRange(0, [file length] - 11)] stringByAppendingPathExtension:@"png"]];
         [scaled addObject:file];
     }
 
