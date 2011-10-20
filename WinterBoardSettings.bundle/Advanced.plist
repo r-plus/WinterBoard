@@ -8,17 +8,15 @@
 			<key>cell</key>
 			<string>PSGroupCell</string>
 			<key>footerText</key>
-			<string>(Drag themes around using the handles.)</string>
+			<string>iPhone-optimize PNGs (for speed).</string>
 		</dict>
 		<dict>
+			<key>action</key>
+			<string>optimizeThemes</string>
 			<key>cell</key>
-			<string>PSLinkCell</string>
-			<key>detail</key>
-			<string>WBSThemesController</string>
-			<key>icon</key>
-			<string>Themes.png</string>
+			<string>PSButtonCell</string>
 			<key>label</key>
-			<string>Select Themes</string>
+			<string>Optimize Themes (v1.0)</string>
 		</dict>
 		<dict>
 			<key>cell</key>
@@ -39,7 +37,7 @@
 			<key>cell</key>
 			<string>PSTitleValueCell</string>
 			<key>label</key>
-			<string>(Drag themes around using the handles.)</string>
+			<string>iPhone-optimize PNGs (for speed).</string>
 			<key>requiredCapabilities</key>
 			<array>
 				<dict>
@@ -54,53 +52,7 @@
 			<key>cell</key>
 			<string>PSGroupCell</string>
 			<key>footerText</key>
-			<string>Most themes are ancient/slow, designed for SummerBoard, not WinterBoard.</string>
-		</dict>
-		<dict>
-			<key>cell</key>
-			<string>PSSwitchCell</string>
-			<key>default</key>
-			<true/>
-			<key>key</key>
-			<string>SummerBoard</string>
-			<key>label</key>
-			<string>SummerBoard Mode</string>
-		</dict>
-		<dict>
-			<key>cell</key>
-			<string>PSGroupCell</string>
-			<key>isStaticText</key>
-			<string>true</string>
-			<key>requiredCapabilities</key>
-			<array>
-				<dict>
-					<key>wildcat</key>
-					<false/>
-					<key>voip</key>
-					<false/>
-				</dict>
-			</array>
-		</dict>
-		<dict>
-			<key>cell</key>
-			<string>PSTitleValueCell</string>
-			<key>label</key>
-			<string>Most themes are ancient/slow, designed for SummerBoard, not WinterBoard.</string>
-			<key>requiredCapabilities</key>
-			<array>
-				<dict>
-					<key>wildcat</key>
-					<false/>
-					<key>voip</key>
-					<false/>
-				</dict>
-			</array>
-		</dict>
-		<dict>
-			<key>cell</key>
-			<string>PSGroupCell</string>
-			<key>footerText</key>
-			<string>WinterBoard can also be found under the normal iOS Settings application.</string>
+			<string>Dumps lots of information (including all filenames being themed) to syslog.</string>
 		</dict>
 		<dict>
 			<key>cell</key>
@@ -108,9 +60,9 @@
 			<key>default</key>
 			<false/>
 			<key>key</key>
-			<string>IconHidden</string>
+			<string>Debug</string>
 			<key>label</key>
-			<string>Hide WinterBoard</string>
+			<string>Debug Logging</string>
 		</dict>
 		<dict>
 			<key>cell</key>
@@ -131,7 +83,7 @@
 			<key>cell</key>
 			<string>PSTitleValueCell</string>
 			<key>label</key>
-			<string>WinterBoard can also be found under the normal iOS Settings application.</string>
+			<string>Dumps lots of information (including all filenames being themed) to syslog.</string>
 			<key>requiredCapabilities</key>
 			<array>
 				<dict>
@@ -145,17 +97,51 @@
 		<dict>
 			<key>cell</key>
 			<string>PSGroupCell</string>
+			<key>footerText</key>
+			<string>All UIImages that are not themed will be saved as PNGs into /tmp/UIImages.</string>
 		</dict>
 		<dict>
 			<key>cell</key>
-			<string>PSLinkCell</string>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<false/>
+			<key>key</key>
+			<string>RecordUI</string>
 			<key>label</key>
-			<string>Advanced (For Themers)</string>
-			<key>detail</key>
-			<string>WBAdvancedController</string>
+			<string>Record UIImages</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>isStaticText</key>
+			<string>true</string>
+			<key>requiredCapabilities</key>
+			<array>
+				<dict>
+					<key>wildcat</key>
+					<false/>
+					<key>voip</key>
+					<false/>
+				</dict>
+			</array>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSTitleValueCell</string>
+			<key>label</key>
+			<string>All UIImages that are not themed will be saved as PNGs into /tmp/UIImages.</string>
+			<key>requiredCapabilities</key>
+			<array>
+				<dict>
+					<key>wildcat</key>
+					<false/>
+					<key>voip</key>
+					<false/>
+				</dict>
+			</array>
 		</dict>
 	</array>
 	<key>title</key>
-	<string>WinterBoard</string>
+	<string>Advanced</string>
 </dict>
 </plist>

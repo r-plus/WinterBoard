@@ -327,45 +327,43 @@ static NSString *_plist;
 @end
 /* }}} */
 
-@interface WBSettingsController: PSListController {
+@interface WBAdvancedController: PSListController {
 }
 
-- (id) initForContentSize:(CGSize)size;
-- (void) dealloc;
-- (void) suspend;
-- (void) navigationBarButtonClicked:(int)buttonIndex;
-- (void) viewWillRedisplay;
-- (void) pushController:(id)controller;
 - (id) specifiers;
 - (void) settingsChanged;
-- (NSString *) title;
-- (void) setPreferenceValue:(id)value specifier:(PSSpecifier *)spec;
-- (id) readPreferenceValue:(PSSpecifier *)spec;
 
 @end
 
-@implementation WBSettingsController
+@implementation WBAdvancedController
 
-+ (void) load {
-    void *libhide(dlopen("/usr/lib/hide.dylib", RTLD_LAZY));
-    IsIconHiddenDisplayId = reinterpret_cast<BOOL (*)(NSString *)>(dlsym(libhide, "IsIconHiddenDisplayId"));
-    HideIconViaDisplayId = reinterpret_cast<BOOL (*)(NSString *)>(dlsym(libhide, "HideIconViaDisplayId"));
-    UnHideIconViaDisplayId = reinterpret_cast<BOOL (*)(NSString *)>(dlsym(libhide, "UnHideIconViaDisplayId"));
+- (id) specifiers {
+    if (!_specifiers)
+        _specifiers = [[self loadSpecifiersFromPlistName:@"Advanced" target:self] retain];
+    return _specifiers;
 }
 
-- (id) initForContentSize:(CGSize)size {
-    if ((self = [super initForContentSize:size]) != nil) {
-        _plist = [[NSString stringWithFormat:@"%@/Library/Preferences/com.saurik.WinterBoard.plist", NSHomeDirectory()] retain];
-        _settings = [([NSMutableDictionary dictionaryWithContentsOfFile:_plist] ?: [NSMutableDictionary dictionary]) retain];
-
-        [_settings setObject:[NSNumber numberWithBool:IsIconHiddenDisplayId(WinterBoardDisplayID)] forKey:@"IconHidden"];
-    } return self;
+- (void) settingsChanged {
+    settingsChanged = YES;
 }
 
-- (void) dealloc {
-    [_settings release];
-    [_plist release];
-    [super dealloc];
+- (void) setPreferenceValue:(id)value specifier:(PSSpecifier *)spec {
+    NSString *key([spec propertyForKey:@"key"]);
+    if ([[spec propertyForKey:@"negate"] boolValue])
+        value = [NSNumber numberWithBool:(![value boolValue])];
+    [_settings setValue:value forKey:key];
+    [self settingsChanged];
+}
+
+- (id) readPreferenceValue:(PSSpecifier *)spec {
+    NSString *key([spec propertyForKey:@"key"]);
+    id defaultValue([spec propertyForKey:@"default"]);
+    id plistValue([_settings objectForKey:key]);
+    if (!plistValue)
+        return defaultValue;
+    if ([[spec propertyForKey:@"negate"] boolValue])
+        plistValue = [NSNumber numberWithBool:(![plistValue boolValue])];
+    return plistValue;
 }
 
 - (void) __optimizeThemes {
@@ -420,6 +418,49 @@ static NSString *_plist;
     } else
         [super alertSheet:sheet buttonClicked:button];
 
+}
+
+@end
+
+@interface WBSettingsController: PSListController {
+}
+
+- (id) initForContentSize:(CGSize)size;
+- (void) dealloc;
+- (void) suspend;
+- (void) navigationBarButtonClicked:(int)buttonIndex;
+- (void) viewWillRedisplay;
+- (void) pushController:(id)controller;
+- (id) specifiers;
+- (void) settingsChanged;
+- (NSString *) title;
+- (void) setPreferenceValue:(id)value specifier:(PSSpecifier *)spec;
+- (id) readPreferenceValue:(PSSpecifier *)spec;
+
+@end
+
+@implementation WBSettingsController
+
++ (void) load {
+    void *libhide(dlopen("/usr/lib/hide.dylib", RTLD_LAZY));
+    IsIconHiddenDisplayId = reinterpret_cast<BOOL (*)(NSString *)>(dlsym(libhide, "IsIconHiddenDisplayId"));
+    HideIconViaDisplayId = reinterpret_cast<BOOL (*)(NSString *)>(dlsym(libhide, "HideIconViaDisplayId"));
+    UnHideIconViaDisplayId = reinterpret_cast<BOOL (*)(NSString *)>(dlsym(libhide, "UnHideIconViaDisplayId"));
+}
+
+- (id) initForContentSize:(CGSize)size {
+    if ((self = [super initForContentSize:size]) != nil) {
+        _plist = [[NSString stringWithFormat:@"%@/Library/Preferences/com.saurik.WinterBoard.plist", NSHomeDirectory()] retain];
+        _settings = [([NSMutableDictionary dictionaryWithContentsOfFile:_plist] ?: [NSMutableDictionary dictionary]) retain];
+
+        [_settings setObject:[NSNumber numberWithBool:IsIconHiddenDisplayId(WinterBoardDisplayID)] forKey:@"IconHidden"];
+    } return self;
+}
+
+- (void) dealloc {
+    [_settings release];
+    [_plist release];
+    [super dealloc];
 }
 
 - (void) suspend {
