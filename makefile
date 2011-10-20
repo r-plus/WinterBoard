@@ -6,10 +6,10 @@ endif
 
 substrate := -I../mobilesubstrate -L../mobilesubstrate -lsubstrate
 
-all: WinterBoard WinterBoard.dylib UIImages WinterBoardSettings Optimize
+all: WinterBoard WinterBoard.dylib WinterBoardSettings Optimize
 
 clean:
-	rm -f WinterBoard WinterBoard.dylib UIImages
+	rm -f WinterBoard WinterBoard.dylib
 
 WinterBoardSettings: Settings.mm makefile
 	$(target)g++ -dynamiclib -g0 -O2 -Wall -o $@ $(filter %.mm,$^) -framework UIKit -framework CoreFoundation -framework Foundation -lobjc -framework CoreGraphics -framework Preferences -F$(PKG_ROOT)/System/Library/PrivateFrameworks
@@ -17,10 +17,6 @@ WinterBoardSettings: Settings.mm makefile
 
 WinterBoard.dylib: Library.mm WBMarkup.mm WBMarkup.h makefile ../mobilesubstrate/substrate.h
 	$(target)g++ -dynamiclib -g0 -O2 -Wall -o $@ $(filter %.mm,$^) -framework CoreFoundation -framework Foundation -lobjc -I/apl/inc/iPhoneOS-2.0 -framework CoreGraphics -framework ImageIO -framework GraphicsServices -framework Celestial $(substrate) -framework UIKit -framework WebCore -framework WebKit -F$(PKG_ROOT)/System/Library/PrivateFrameworks
-	ldid -S $@
-
-UIImages: UIImages.mm makefile
-	$(target)g++ -g0 -O2 -Wall -Werror -o $@ $(filter %.mm,$^) -framework UIKit -framework Foundation -framework CoreFoundation -lobjc -I/apl/inc/iPhoneOS-2.0 $(substrate)
 	ldid -S $@
 
 WinterBoard: Application.mm makefile
@@ -53,7 +49,7 @@ package: all
 	find winterboard -name .svn | while read -r line; do rm -rf "$${line}"; done
 	cp -a extrainst_ preinst prerm winterboard/DEBIAN
 	sed -e 's/VERSION/$(shell ./version.sh)/g' control >winterboard/DEBIAN/control
-	cp -a Test.sh Icon-Small.png icon.png icon-72.png icon@2x.png WinterBoard.dylib WinterBoard UIImages Info.plist winterboard/Applications/WinterBoard.app
+	cp -a Test.sh Icon-Small.png icon.png icon-72.png icon@2x.png WinterBoard.dylib WinterBoard Info.plist winterboard/Applications/WinterBoard.app
 	file="winterboard_$$(grep ^Version: winterboard/DEBIAN/control | cut -d ' ' -f 2)_iphoneos-arm.deb"; echo "$$file"; ln -sf "$$file" winterboard.deb
 	dpkg-deb -b winterboard winterboard.deb
 

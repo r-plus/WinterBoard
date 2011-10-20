@@ -193,6 +193,7 @@ static BOOL (*_GSFontGetUseLegacyFontMetrics)();
     (_GSFontGetUseLegacyFontMetrics == NULL ? YES : _GSFontGetUseLegacyFontMetrics())
 
 static bool Debug_ = false;
+static bool UIDebug_ = false;
 static bool Engineer_ = false;
 static bool SummerBoard_ = true;
 static bool SpringBoard_;
@@ -1546,7 +1547,18 @@ MSHook(UIImage *, _UIImageWithName, NSString *name) {
         if (NSString *path = $pathForFile$inBundle$(name, _UIKitBundle(), true))
             image = $getImage$(path);
         [UIImages_ setObject:(image == nil ? [NSNull null] : reinterpret_cast<id>(image)) forKey:key];
-        return image == nil ? __UIImageWithName(name) : image;
+        if (image != nil)
+            return image;
+
+        image = __UIImageWithName(name);
+
+        if (UIDebug_) {
+            NSString *path([@"/tmp/UIImages/" stringByAppendingString:name]);
+            if (![Manager_ fileExistsAtPath:path])
+                [UIImagePNGRepresentation(image) writeToFile:path atomically:YES];
+        }
+
+        return image;
     }
 }
 // }}}
@@ -1854,6 +1866,9 @@ MSInitialize {
         MSHookFunction(_UIImageWithNameInDomain, &$_UIImageWithNameInDomain, &__UIImageWithNameInDomain);
     }
     // }}}
+
+    if (Debug_ && [Manager_ fileExistsAtPath:@"/tmp/UIImages"])
+        UIDebug_ = true;
 
     [pool release];
 }
