@@ -248,14 +248,40 @@ static NSArray *$useScale$(NSArray *files, bool use = true) {
     if (Scale_ == 1)
         return files;
 
-    NSMutableArray *scaled([NSMutableArray arrayWithCapacity:([files count] * 2)]);
+    NSString *idiom(IsWild_ ? @"ipad" : @"iphone");
+
+    NSMutableArray *scaled([NSMutableArray arrayWithCapacity:([files count] * 4)]);
 
     for (NSString *file in files) {
-        if (use && Scale_ == 2)
-            [scaled addObject:[NSString stringWithFormat:@"%@@2x.%@", [file stringByDeletingPathExtension], [file pathExtension]]];
-        if ([file hasSuffix:@"@2x~iphone.png"])
-            [scaled addObject:[[file substringWithRange:NSMakeRange(0, [file length] - 11)] stringByAppendingPathExtension:@"png"]];
-        [scaled addObject:file];
+        NSString *base([file stringByDeletingPathExtension]);
+        NSString *extension([file pathExtension]);
+
+        if (use) {
+            if (Scale_ == 2) {
+                [scaled addObject:[NSString stringWithFormat:@"%@@2x~%@.%@", base, idiom, extension]];
+                if (!IsWild_)
+                    [scaled addObject:[NSString stringWithFormat:@"%@@2x.%@", base, extension]];
+            }
+
+            [scaled addObject:[NSString stringWithFormat:@"%@~%@.%@", base, idiom, extension]];
+
+            // if (!IsWild_) <- support old themes
+            [scaled addObject:file];
+        } else if ([base hasSuffix: @"@2x"]) {
+            [scaled addObject:[NSString stringWithFormat:@"%@~iphone.%@", base, extension]];
+            [scaled addObject:file];
+
+            NSString *rest([base substringWithRange:NSMakeRange(0, [base length] - 3)]);
+            [scaled addObject:[NSString stringWithFormat:@"%@~iphone.%@", rest, extension]];
+            [scaled addObject:[rest stringByAppendingPathExtension:extension]];
+        } else {
+            // XXX: this code isn't really complete
+
+            [scaled addObject:file];
+
+            if ([base hasSuffix:@"~iphone"])
+                [scaled addObject:[[base substringWithRange:NSMakeRange(0, [base length] - 7)] stringByAppendingPathExtension:extension]];
+        }
     }
 
     return scaled;
