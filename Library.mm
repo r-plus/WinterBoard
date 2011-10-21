@@ -126,6 +126,7 @@ MSClassHook(CKMessageCell)
 MSClassHook(CKTimestampView)
 MSClassHook(CKTranscriptCell)
 MSClassHook(CKTranscriptController)
+MSClassHook(CKTranscriptHeaderView)
 MSClassHook(CKTranscriptTableView)
 
 MSClassHook(SBApplication)
@@ -1539,6 +1540,11 @@ MSInstanceMessageHook1(void, SBIconLabel, drawRect, CGRect, rect) {
 }
 
 // ChatKit {{{
+MSInstanceMessageHook0(void, CKTranscriptHeaderView, layoutSubviews) {
+    [self wb$setBackgroundColor:[UIColor clearColor]];
+    return MSOldCall();
+}
+
 MSInstanceMessageHook1(void, CKMessageCell, addBalloonView, CKBalloonView *, balloon) {
     MSOldCall(balloon);
     [balloon setBackgroundColor:[UIColor clearColor]];
