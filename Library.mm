@@ -1319,6 +1319,7 @@ MSHook(void, SBStatusBarTimeView$drawRect$, SBStatusBarTimeView *self, SEL sel, 
 @interface UIView (WinterBoard)
 - (bool) wb$isWBImageView;
 - (void) wb$logHierarchy;
+- (void) wb$setBackgroundColor:(UIColor *)color;
 @end
 
 @implementation UIView (WinterBoard)
@@ -1329,6 +1330,12 @@ MSHook(void, SBStatusBarTimeView$drawRect$, SBStatusBarTimeView *self, SEL sel, 
 
 - (void) wb$logHierarchy {
     WBLogHierarchy(self);
+}
+
+- (void) wb$setBackgroundColor:(UIColor *)color {
+    [self setBackgroundColor:color];
+    for (UIView *child in [self subviews])
+        [child wb$setBackgroundColor:color];
 }
 
 @end
@@ -1539,12 +1546,13 @@ MSInstanceMessageHook1(void, CKMessageCell, addBalloonView, CKBalloonView *, bal
 
 MSInstanceMessageHook1(void, CKTranscriptCell, setBackgroundColor, UIColor *, color) {
     MSOldCall([UIColor clearColor]);
+    [[self contentView] wb$setBackgroundColor:[UIColor clearColor]];
 }
 
 MSInstanceMessageHook2(id, CKTranscriptCell, initWithStyle,reuseIdentifier, int, style, NSString *, reuse) {
     if ((self = MSOldCall(style, reuse)) != nil) {
         [self setBackgroundColor:[UIColor clearColor]];
-        [[self contentView] setBackgroundColor:[UIColor clearColor]];
+        [[self contentView] wb$setBackgroundColor:[UIColor clearColor]];
     } return self;
 }
 
