@@ -122,6 +122,7 @@ MSMetaClassHook(UIImage)
 MSClassHook(UINavigationBar)
 MSClassHook(UIToolbar)
 
+MSClassHook(CKBalloonView)
 MSClassHook(CKMessageCell)
 MSClassHook(CKTimestampView)
 MSClassHook(CKTranscriptCell)
@@ -867,6 +868,7 @@ MSHook(void, SBStatusBarContentsView$didMoveToSuperview, UIView *self, SEL sel) 
 static NSArray *Wallpapers_;
 static bool Papered_;
 static bool Docked_;
+static bool SMSBackgrounded_;
 static NSString *WallpaperFile_;
 static UIImageView *WallpaperImage_;
 static UIWebDocumentView *WallpaperPage_;
@@ -1540,6 +1542,16 @@ MSInstanceMessageHook1(void, SBIconLabel, drawRect, CGRect, rect) {
 }
 
 // ChatKit {{{
+MSInstanceMessageHook2(id, CKBalloonView, initWithFrame,delegate, CGRect, frame, id, delegate) {
+    if ((self = MSOldCall(frame, delegate)) != nil) {
+        [self setBackgroundColor:[UIColor clearColor]];
+    } return self;
+}
+
+MSInstanceMessageHook0(BOOL, CKBalloonView, _canUseLayerBackedBalloon) {
+    return SMSBackgrounded_ ? NO : MSOldCall();
+}
+
 MSInstanceMessageHook0(void, CKTranscriptHeaderView, layoutSubviews) {
     [self wb$setBackgroundColor:[UIColor clearColor]];
     return MSOldCall();
@@ -1593,6 +1605,8 @@ MSInstanceMessageHook0(void, CKTranscriptController, loadView) {
 
     if (NSString *path = $getTheme$($useScale$([NSArray arrayWithObjects:@"SMSBackground.png", @"SMSBackground.jpg", nil])))
         if (UIImage *image = $getImage$(path)) {
+            SMSBackgrounded_ = true;
+
             UIView *&_transcriptTable(MSHookIvar<UIView *>(self, "_transcriptTable"));
             UIView *&_transcriptLayer(MSHookIvar<UIView *>(self, "_transcriptLayer"));
             UIView *table;
