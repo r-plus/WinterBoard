@@ -20,7 +20,7 @@ WinterBoard.dylib: Library.mm WBMarkup.mm WBMarkup.h makefile ../mobilesubstrate
 	ldid -S $@
 
 WinterBoard: Application.mm makefile
-	$(target)g++ -g0 -O2 -Wall -Werror -o $@ $(filter %.mm,$^) -framework UIKit -framework Foundation -framework CoreFoundation -lobjc -framework CoreGraphics -I/apl/sdk -framework Preferences -F$(PKG_ROOT)/System/Library/PrivateFrameworks
+	$(target)g++ -g0 -O2 -Wall -Werror -o $@ $(filter %.mm,$^) -framework UIKit -framework Foundation -framework CoreFoundation -lobjc -framework CoreGraphics -I/apl/sdk -framework Preferences -F$(PKG_ROOT)/System/Library/PrivateFrameworks $(substrate)
 	ldid -S $@
 
 Optimize: Optimize.cpp makefile
