@@ -939,15 +939,6 @@ MSInstanceMessageHook0(id, SBUIController, init) {
         IsWild_ = machine != NULL && strncmp(machine, "iPad", 4) == 0;
     }
 
-    BOOL (*GSSystemHasCapability)(CFStringRef) = reinterpret_cast<BOOL (*)(CFStringRef)>(dlsym(RTLD_DEFAULT, "GSSystemHasCapability"));
-
-    if ([Info_ objectForKey:@"UndockedIconLabels"] == nil)
-        [Info_ setObject:[NSNumber numberWithBool:(
-            !(paper != nil || GSSystemHasCapability != NULL && GSSystemHasCapability(CFSTR("homescreen-wallpaper"))) ||
-            [Info_ objectForKey:@"DockedIconLabelStyle"] != nil ||
-            [Info_ objectForKey:@"UndockedIconLabelStyle"] != nil
-        )] forKey:@"UndockedIconLabels"];
-
     if (Debug_)
         NSLog(@"WB:Debug:Info = %@", [Info_ description]);
 
@@ -1415,6 +1406,20 @@ MSHook(id, SBIconLabel$initWithSize$label$, SBIconLabel *self, SEL sel, CGSize s
 }
 
 MSHook(void, SBIconLabel$setInDock$, SBIconLabel *self, SEL sel, BOOL docked) {
+    static bool gssc(false);
+    if (!gssc) {
+        BOOL (*GSSystemHasCapability)(CFStringRef) = reinterpret_cast<BOOL (*)(CFStringRef)>(dlsym(RTLD_DEFAULT, "GSSystemHasCapability"));
+        Papered_ |= GSSystemHasCapability != NULL && GSSystemHasCapability(CFSTR("homescreen-wallpaper"));
+        gssc = true;
+
+        if ([Info_ objectForKey:@"UndockedIconLabels"] == nil)
+            [Info_ setObject:[NSNumber numberWithBool:(
+                !Papered_ ||
+                [Info_ objectForKey:@"DockedIconLabelStyle"] != nil ||
+                [Info_ objectForKey:@"UndockedIconLabelStyle"] != nil
+            )] forKey:@"UndockedIconLabels"];
+    }
+
     id &_label(MSHookIvar<id>(self, "_label"));
     if (![Info_ wb$boolForKey:@"UndockedIconLabels"])
         docked = true;
@@ -1906,6 +1911,7 @@ MSInitialize {
     // SpringBoard {{{
     if (SpringBoard_) {
         Wallpapers_ = [[NSArray arrayWithObjects:@"Wallpaper.mp4", @"Wallpaper@2x.png", @"Wallpaper@2x.jpg", @"Wallpaper.png", @"Wallpaper.jpg", @"Wallpaper.html", nil] retain];
+        Papered_ = $getTheme$(Wallpapers_) != nil;
         Docked_ = $getTheme$([NSArray arrayWithObjects:@"Dock.png", nil]);
 
         CFNotificationCenterAddObserver(
