@@ -47,7 +47,7 @@ bool _itv;
         _itv = true; \
         _ltv = _ctv; \
     } \
-    NSLog(@"%lu.%.6u[%f]:_trace()@%s:%u[%s]\n", \
+    NSLog(@"%lu.%.6u[%f]:WB:_trace()@%s:%u[%s]\n", \
         _ctv.tv_sec, _ctv.tv_usec, \
         (_ctv.tv_sec - _ltv.tv_sec) + (_ctv.tv_usec - _ltv.tv_usec) / 1000000.0, \
         __FILE__, __LINE__, __FUNCTION__\
