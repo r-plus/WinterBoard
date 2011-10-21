@@ -371,18 +371,17 @@ static NSString *_plist;
 }
 
 - (void) optimizeThemes {
-    UIActionSheet *sheet([[[UIActionSheet alloc]
+    UIAlertView *alert([[[UIAlertView alloc]
         initWithTitle:@"Optimize Themes"
-        buttons:[NSArray arrayWithObjects:@"Optimize", @"Cancel", nil]
-        defaultButtonIndex:1
+        message:@"Please note that this setting /replaces/ the PNG files that came with the theme. PNG files that have been iPhone-optimized cannot be viewed on a normal computer unless they are first deoptimized. You can use Cydia to reinstall themes that have been optimized in order to revert to the original PNG files."
         delegate:self
-        context:@"optimize"
+        cancelButtonTitle:@"Cancel"
+        otherButtonTitles:@"Optimize", nil
     ] autorelease]);
 
-    [sheet setBodyText:@"Please note that this setting /replaces/ the PNG files that came with the theme. PNG files that have been iPhone-optimized cannot be viewed on a normal computer unless they are first deoptimized. You can use Cydia to reinstall themes that have been optimized in order to revert to the original PNG files."];
-    [sheet setNumberOfRows:1];
-    [sheet setDestructiveButtonIndex:0];
-    [sheet popupAlertAnimated:YES];
+    [alert setContext:@"optimize"];
+    [alert setNumberOfRows:1];
+    [alert show];
 }
 
 - (void) _optimizeThemes {
@@ -404,20 +403,18 @@ static NSString *_plist;
     [self settingsChanged];
 }
 
-- (void) alertSheet:(UIActionSheet *)sheet buttonClicked:(int)button {
-    NSString *context([sheet context]);
+- (void) alertView:(UIAlertView *)alert clickedButtonAtIndex:(NSInteger)button {
+    NSString *context([alert context]);
 
     if ([context isEqualToString:@"optimize"]) {
-        switch (button) {
-            case 1:
-                [self performSelector:@selector(_optimizeThemes) withObject:nil afterDelay:0];
-            break;
+        if (button == [alert firstOtherButtonIndex]) {
+            [self performSelector:@selector(_optimizeThemes) withObject:nil afterDelay:0];
         }
 
-        [sheet dismiss];
-    } else
-        [super alertSheet:sheet buttonClicked:button];
-
+        [alert dismissWithClickedButtonIndex:-1 animated:YES];
+    }
+    /*else if ([super respondsToSelector:@selector(alertView:clickedButtonAtIndex:)])
+        [super alertView:alert clickedButtonAtIndex:button];*/
 }
 
 @end
