@@ -242,7 +242,7 @@ static unsigned $getScale$(NSString *path) {
 }
 
 static NSArray *$useScale$(NSArray *files, bool use = true) {
-    if (Scale_ == 0) {
+    if (use && Scale_ == 0) {
         UIScreen *screen([UIScreen mainScreen]);
         if ([screen respondsToSelector:@selector(scale)])
             Scale_ = [screen scale];
