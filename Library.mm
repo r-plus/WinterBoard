@@ -1555,6 +1555,7 @@ MSInstanceMessageHook1(void, CKTranscriptCell, setBackgroundColor, UIColor *, co
     [[self contentView] wb$setBackgroundColor:[UIColor clearColor]];
 }
 
+// iOS >= 5.0
 MSInstanceMessageHook2(id, CKTranscriptCell, initWithStyle,reuseIdentifier, int, style, NSString *, reuse) {
     if ((self = MSOldCall(style, reuse)) != nil) {
         [self setBackgroundColor:[UIColor clearColor]];
@@ -1562,6 +1563,7 @@ MSInstanceMessageHook2(id, CKTranscriptCell, initWithStyle,reuseIdentifier, int,
     } return self;
 }
 
+// iOS << 5.0
 MSInstanceMessageHook2(id, CKMessageCell, initWithStyle,reuseIdentifier, int, style, NSString *, reuse) {
     if ((self = MSOldCall(style, reuse)) != nil) {
         [self setBackgroundColor:[UIColor clearColor]];
