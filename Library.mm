@@ -1942,7 +1942,7 @@ MSInitialize {
     if (SpringBoard_) {
         Wallpapers_ = [[NSArray arrayWithObjects:@"Wallpaper.mp4", @"Wallpaper@2x.png", @"Wallpaper@2x.jpg", @"Wallpaper.png", @"Wallpaper.jpg", @"Wallpaper.html", nil] retain];
         Papered_ = $getTheme$(Wallpapers_) != nil;
-        Docked_ = $getTheme$([NSArray arrayWithObjects:@"Dock.png", nil]);
+        Docked_ = $getTheme$([NSArray arrayWithObjects:@"Dock.png", nil]) != nil;
 
         CFNotificationCenterAddObserver(
             CFNotificationCenterGetDarwinNotifyCenter(),
