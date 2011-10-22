@@ -323,8 +323,12 @@ static NSString *$pathForFile$inBundle$(NSString *file, NSBundle *bundle, bool u
 
     if (identifier != nil)
         [names addObject:[NSString stringWithFormat:@"Bundles/%@/%@", identifier, file]];
-    if (NSString *folder = [[bundle bundlePath] lastPathComponent])
+    if (NSString *folder = [[bundle bundlePath] lastPathComponent]) {
         [names addObject:[NSString stringWithFormat:@"Folders/%@/%@", folder, file]];
+        NSString *base([folder stringByDeletingPathExtension]);
+        if ([base hasSuffix:@"~iphone"])
+            [names addObject:[NSString stringWithFormat:@"Folders/%@.%@/%@", [base substringWithRange:NSMakeRange(0, [base length] - 7)], [folder pathExtension], file]];
+    }
     if (ui)
         [names addObject:[NSString stringWithFormat:@"UIImages/%@", file]];
 
