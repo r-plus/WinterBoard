@@ -276,9 +276,10 @@ static NSArray *$useScale$(NSArray *files, bool use = true) {
             [scaled addObject:[NSString stringWithFormat:@"%@~iphone.%@", base, extension]];
             [scaled addObject:file];
 
-            NSString *rest([base substringWithRange:NSMakeRange(0, [base length] - 3)]);
+            // XXX: this actually can't be used, as the person loading the file doesn't realize that the @2x changed
+            /*NSString *rest([base substringWithRange:NSMakeRange(0, [base length] - 3)]);
             [scaled addObject:[NSString stringWithFormat:@"%@~iphone.%@", rest, extension]];
-            [scaled addObject:[rest stringByAppendingPathExtension:extension]];
+            [scaled addObject:[rest stringByAppendingPathExtension:extension]];*/
         } else {
             // XXX: this code isn't really complete
 
