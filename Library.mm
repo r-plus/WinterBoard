@@ -294,8 +294,13 @@ static NSArray *$useScale$(NSArray *files, bool use = true) {
 }
 
 static NSString *$getTheme$(NSArray *files, NSArray *themes = Themes_) {
-    if (NSString *path = [Themed_ objectForKey:files])
-        return reinterpret_cast<id>(path) == [NSNull null] ? nil : path;
+    // XXX: this is not reasonable; OMG
+    id key(files);
+
+    @synchronized (Themed_) {
+        if (NSString *path = [Themed_ objectForKey:key])
+            return reinterpret_cast<id>(path) == [NSNull null] ? nil : path;
+    }
 
     if (Debug_)
         NSLog(@"WB:Debug: %@", [files description]);
@@ -312,7 +317,10 @@ static NSString *$getTheme$(NSArray *files, NSArray *themes = Themes_) {
     path = nil;
   set:
 
-    [Themed_ setObject:(path == nil ? [NSNull null] : reinterpret_cast<id>(path)) forKey:files];
+    @synchronized (Themed_) {
+        [Themed_ setObject:(path == nil ? [NSNull null] : reinterpret_cast<id>(path)) forKey:key];
+    }
+
     return path;
 }
 // }}}
