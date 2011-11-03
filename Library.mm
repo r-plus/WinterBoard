@@ -356,6 +356,8 @@ static NSString *$pathForFile$inBundle$(NSString *file, NSBundle *bundle, bool u
         remapResourceName(Four_ ? @"SBDockBG-old.png" : @"SBDockBG.png", @"Dock")
         remapResourceName(@"SBWeatherCelsius.png", @"Icons/Weather")
 
+    [names addObject:[NSString stringWithFormat:@"Fallback/%@", file]];
+
     if (NSString *path = $getTheme$($useScale$(names, ui)))
         return path;
 
