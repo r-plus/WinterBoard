@@ -683,42 +683,41 @@ static struct WBStringDrawingState {
     NSString *info_;
 } *stringDrawingState_;
 
-MSInstanceMessageHook4(CGSize, NSString, drawAtPoint,forWidth,withFont,lineBreakMode, CGPoint, point, float, width, UIFont *, font, int, mode) {
+MSInstanceMessageHook6(CGSize, NSString, drawAtPoint,forWidth,withFont,lineBreakMode,letterSpacing,includeEmoji, CGPoint, point, float, width, UIFont *, font, int, mode, float, spacing, BOOL, emoji) {
     WBStringDrawingState *state(stringDrawingState_);
     if (state == NULL)
-        return MSOldCall(point, width, font, mode);
+        return MSOldCall(point, width, font, mode, spacing, emoji);
 
     if (--state->count_ == 0)
         stringDrawingState_ = state->next_;
     if (state->info_ == nil)
-        return MSOldCall(point, width, font, mode);
+        return MSOldCall(point, width, font, mode, spacing, emoji);
 
     NSString *info([Info_ objectForKey:state->info_]);
     if (info == nil)
-        return MSOldCall(point, width, font, mode);
+        return MSOldCall(point, width, font, mode, spacing, emoji);
 
     NSString *base(state->base_ ?: @"");
     [self drawAtPoint:point withStyle:[NSString stringWithFormat:@"%@;%@;%@", [font markupDescription], base, info]];
     return CGSizeZero;
 }
 
-MSInstanceMessageHook2(CGSize, NSString, drawAtPoint,withFont, CGPoint, point, UIFont *, font) {
+MSInstanceMessageHook4(CGSize, NSString, sizeWithFont,forWidth,lineBreakMode,letterSpacing, UIFont *, font, float, width, int, mode, float, spacing) {
     WBStringDrawingState *state(stringDrawingState_);
     if (state == NULL)
-        return MSOldCall(point, font);
+        return MSOldCall(font, width, mode, spacing);
 
     if (--state->count_ == 0)
         stringDrawingState_ = state->next_;
     if (state->info_ == nil)
-        return MSOldCall(point, font);
+        return MSOldCall(font, width, mode, spacing);
 
     NSString *info([Info_ objectForKey:state->info_]);
     if (info == nil)
-        return MSOldCall(point, font);
+        return MSOldCall(font, width, mode, spacing);
 
     NSString *base(state->base_ ?: @"");
-    [self drawAtPoint:point withStyle:[NSString stringWithFormat:@"%@;%@;%@", [font markupDescription], base, info]];
-    return CGSizeZero;
+    return [self sizeWithStyle:[NSString stringWithFormat:@"%@;%@;%@", [font markupDescription], base, info] forWidth:width];
 }
 
 MSInstanceMessageHook1(CGSize, NSString, sizeWithFont, UIFont *, font) {
@@ -1503,7 +1502,7 @@ MSInstanceMessageHook2(CGSize, WebCoreFrameBridge, renderedSizeOfNode,constraine
 }
 // }}}
 
-MSInstanceMessageHook1(void, SBIconLabel, drawRect, CGRect, rect) {
+MSInstanceMessage1(void, SBIconLabel, drawRect, CGRect, rect) {
     CGRect bounds = [self bounds];
 
     static Ivar drawMoreLegibly = object_getInstanceVariable(self, "_drawMoreLegibly", NULL);
@@ -1554,6 +1553,23 @@ MSInstanceMessageHook1(void, SBIconLabel, drawRect, CGRect, rect) {
 
     CGSize size = [label sizeWithStyle:style forWidth:bounds.size.width];
     [label drawAtPoint:CGPointMake((bounds.size.width - size.width) / 2, 0) withStyle:style];
+}
+
+MSInstanceMessage0(CGImageRef, SBIconLabel, buildLabelImage) {
+    bool docked((MSHookIvar<unsigned>(self, "_inDock") & 0x2) != 0);
+
+    WBStringDrawingState labelState = {NULL, 2, [NSString stringWithFormat:@""
+        "color: %@;"
+    ,
+        (docked || !SummerBoard_ ? @"white" : @"#b3b3b3")
+    ], docked ? @"DockedIconLabelStyle" : @"UndockedIconLabelStyle"};
+
+    stringDrawingState_ = &labelState;
+
+    CGImageRef image(MSOldCall());
+
+    stringDrawingState_ = NULL;
+    return image;
 }
 
 // ChatKit {{{
@@ -1838,6 +1854,11 @@ static void SBInitialize() {
 
     WBRename(SBDockIconListView, setFrame:, setFrame$);
     MSHookMessage(object_getClass($SBDockIconListView), @selector(shouldShowNewDock), &$SBDockIconListView$shouldShowNewDock, &_SBDockIconListView$shouldShowNewDock);
+
+    if (kCFCoreFoundationVersionNumber < 600)
+        WBRename(SBIconLabel, drawRect:, drawRect$);
+    else
+        WBRename(SBIconLabel, buildLabelImage, buildLabelImage);
 
     WBRename(SBIconLabel, initWithSize:label:, initWithSize$label$);
     WBRename(SBIconLabel, setInDock:, setInDock$);
