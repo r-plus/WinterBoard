@@ -702,7 +702,7 @@ static void $drawLabel$(NSString *label, CGRect rect, NSString *style, NSString 
         style = [style stringByAppendingString:custom];
 
     CGSize size = [label sizeWithStyle:style forWidth:rect.size.width];
-    [label drawAtPoint:CGPointMake((rect.size.width - size.width) / 2, 0) withStyle:style];
+    [label drawAtPoint:CGPointMake((rect.size.width - size.width) / 2 + rect.origin.x, rect.origin.y) withStyle:style];
 }
 
 static struct WBStringDrawingState {
@@ -762,7 +762,12 @@ MSInstanceMessageHook7(CGSize, NSString, _drawInRect,withFont,lineBreakMode,alig
 
     NSString *base(state->base_ ?: @"");
     NSString *extra([NSString stringWithFormat:@"text-align: %@", textAlign]);
-    [self drawInRect:rect withStyle:[NSString stringWithFormat:@"%@;%@;%@;%@", [font markupDescription], extra, base, info]];
+
+    if (true)
+        $drawLabel$(self, rect, [NSString stringWithFormat:@"%@;%@", [font markupDescription], base], info);
+    else
+        [self drawInRect:rect withStyle:[NSString stringWithFormat:@"%@;%@;%@;%@", [font markupDescription], extra, base, info]];
+
     return CGSizeZero;
 }
 
