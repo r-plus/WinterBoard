@@ -60,7 +60,7 @@
 			<key>cell</key>
 			<string>PSSwitchCell</string>
 			<key>default</key>
-			<true/>
+			<false/>
 			<key>key</key>
 			<string>SummerBoard</string>
 			<key>label</key>

@@ -448,7 +448,20 @@ static NSString *_plist;
 - (id) initForContentSize:(CGSize)size {
     if ((self = [super initForContentSize:size]) != nil) {
         _plist = [[NSString stringWithFormat:@"%@/Library/Preferences/com.saurik.WinterBoard.plist", NSHomeDirectory()] retain];
-        _settings = [([NSMutableDictionary dictionaryWithContentsOfFile:_plist] ?: [NSMutableDictionary dictionary]) retain];
+        _settings = [NSMutableDictionary dictionaryWithContentsOfFile:_plist];
+
+        bool set;
+        if (_settings != nil)
+            set = true;
+        else {
+            set = false;
+            _settings = [NSMutableDictionary dictionary];
+        }
+
+        _settings = [_settings retain];
+
+        if (set && [_settings objectForKey:@"SummerBoard"] == nil)
+            [_settings setObject:[NSNumber numberWithBool:YES] forKey:@"SummerBoard"];
 
         [_settings setObject:[NSNumber numberWithBool:IsIconHiddenDisplayId(WinterBoardDisplayID)] forKey:@"IconHidden"];
     } return self;

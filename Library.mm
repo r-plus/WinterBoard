@@ -200,7 +200,7 @@ static BOOL (*_GSFontGetUseLegacyFontMetrics)();
 static bool Debug_ = false;
 static bool UIDebug_ = false;
 static bool Engineer_ = false;
-static bool SummerBoard_ = true;
+static bool SummerBoard_ = false;
 static bool SpringBoard_;
 
 static UIImage *(*_UIApplicationImageWithName)(NSString *name);
@@ -1972,6 +1972,9 @@ MSInitialize {
     if (NSDictionary *settings = [NSDictionary dictionaryWithContentsOfFile:[NSString stringWithFormat:@"/User/Library/Preferences/com.saurik.WinterBoard.plist"]]) {
         if (NSNumber *value = [settings objectForKey:@"SummerBoard"])
             SummerBoard_ = [value boolValue];
+        else
+            SummerBoard_ = true;
+
         if (NSNumber *value = [settings objectForKey:@"Debug"])
             Debug_ = [value boolValue];
         if (NSNumber *value = [settings objectForKey:@"RecordUI"])
