@@ -717,8 +717,22 @@ MSInstanceMessageHook7(CGSize, NSString, _drawInRect,withFont,lineBreakMode,alig
     if (info == nil)
         return MSOldCall(rect, font, mode, alignment, spacing, emoji, truncation);
 
+    NSString *textAlign;
+    switch (alignment) {
+        default:
+        case WebTextAlignmentLeft:
+            textAlign = @"left";
+            break;
+        case WebTextAlignmentCenter:
+            textAlign = @"center";
+            break;
+        case WebTextAlignmentRight:
+            textAlign = @"right";
+            break;
+    }
+
     NSString *base(state->base_ ?: @"");
-    NSString *extra(@"text-align: center");
+    NSString *extra([NSString stringWithFormat:@"text-align: %@", textAlign]);
     [self drawInRect:rect withStyle:[NSString stringWithFormat:@"%@;%@;%@;%@", [font markupDescription], extra, base, info]];
     return CGSizeZero;
 }
