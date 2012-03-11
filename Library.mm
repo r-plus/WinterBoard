@@ -1922,7 +1922,7 @@ static void SBInitialize() {
     WBRename(SBDockIconListView, setFrame:, setFrame$);
     MSHookMessage(object_getClass($SBDockIconListView), @selector(shouldShowNewDock), &$SBDockIconListView$shouldShowNewDock, &_SBDockIconListView$shouldShowNewDock);
 
-    if (kCFCoreFoundationVersionNumber < 600)
+    if (kCFCoreFoundationVersionNumber < 600 || SummerBoard_)
         WBRename(SBIconLabel, drawRect:, drawRect$);
     else
         WBRename(SBIconLabel, buildLabelImage, buildLabelImage);
