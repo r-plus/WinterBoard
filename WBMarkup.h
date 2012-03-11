@@ -7,12 +7,6 @@
 @class WAKWindow;
 @class WebView;
 
-typedef enum {
-    WebTextAlignmentLeft = 0,
-    WebTextAlignmentCenter = 1,
-    WebTextAlignmentRight = 2,
-} WebTextAlignment;
-
 @interface WBMarkup : NSObject {
     /*04*/ WebView *view_;
     /*08*/ DOMDocument *document_;

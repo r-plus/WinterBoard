@@ -703,7 +703,7 @@ MSInstanceMessageHook6(CGSize, NSString, drawAtPoint,forWidth,withFont,lineBreak
     return CGSizeZero;
 }
 
-MSInstanceMessageHook7(CGSize, NSString, _drawInRect,withFont,lineBreakMode,alignment,lineSpacing,includeEmoji,truncationRect, CGRect, rect, UIFont *, font, UILineBreakMode, mode, WebTextAlignment, alignment, float, spacing, BOOL, emoji, CGRect, truncation) {
+MSInstanceMessageHook7(CGSize, NSString, _drawInRect,withFont,lineBreakMode,alignment,lineSpacing,includeEmoji,truncationRect, CGRect, rect, UIFont *, font, UILineBreakMode, mode, UITextAlignment, alignment, float, spacing, BOOL, emoji, CGRect, truncation) {
     WBStringDrawingState *state(stringDrawingState_);
     if (state == NULL)
         return MSOldCall(rect, font, mode, alignment, spacing, emoji, truncation);
@@ -720,13 +720,13 @@ MSInstanceMessageHook7(CGSize, NSString, _drawInRect,withFont,lineBreakMode,alig
     NSString *textAlign;
     switch (alignment) {
         default:
-        case WebTextAlignmentLeft:
+        case UITextAlignmentLeft:
             textAlign = @"left";
             break;
-        case WebTextAlignmentCenter:
+        case UITextAlignmentCenter:
             textAlign = @"center";
             break;
-        case WebTextAlignmentRight:
+        case UITextAlignmentRight:
             textAlign = @"right";
             break;
     }
