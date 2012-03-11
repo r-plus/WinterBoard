@@ -1580,7 +1580,7 @@ MSInstanceMessage1(void, SBIconLabel, drawRect, CGRect, rect) {
 MSInstanceMessage0(CGImageRef, SBIconLabel, buildLabelImage) {
     bool docked((MSHookIvar<unsigned>(self, "_inDock") & 0x2) != 0);
 
-    WBStringDrawingState labelState = {NULL, 2, [NSString stringWithFormat:@""
+    WBStringDrawingState labelState = {NULL, 0, [NSString stringWithFormat:@""
         "color: %@;"
     ,
         (docked || !SummerBoard_ ? @"white" : @"#b3b3b3")
