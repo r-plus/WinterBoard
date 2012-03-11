@@ -702,6 +702,26 @@ MSInstanceMessageHook6(CGSize, NSString, drawAtPoint,forWidth,withFont,lineBreak
     return CGSizeZero;
 }
 
+MSInstanceMessageHook6(CGSize, NSString, drawInRect,withFont,lineBreakMode,alignment,lineSpacing,includeEmoji, CGRect, rect, UIFont *, font, int, mode, int, alignment, float, spacing, BOOL, emoji) {
+    WBStringDrawingState *state(stringDrawingState_);
+    if (state == NULL)
+        return MSOldCall(rect, font, mode, alignment, spacing, emoji);
+
+    if (--state->count_ == 0)
+        stringDrawingState_ = state->next_;
+    if (state->info_ == nil)
+        return MSOldCall(rect, font, mode, alignment, spacing, emoji);
+
+    NSString *info([Info_ objectForKey:state->info_]);
+    if (info == nil)
+        return MSOldCall(rect, font, mode, alignment, spacing, emoji);
+
+    NSString *base(state->base_ ?: @"");
+    NSString *align(@"text-align: center");
+    [self drawInRect:rect withStyle:[NSString stringWithFormat:@"%@;%@;%@;%@", [font markupDescription], align, base, info]];
+    return CGSizeZero;
+}
+
 MSInstanceMessageHook4(CGSize, NSString, sizeWithFont,forWidth,lineBreakMode,letterSpacing, UIFont *, font, float, width, int, mode, float, spacing) {
     WBStringDrawingState *state(stringDrawingState_);
     if (state == NULL)
@@ -1828,6 +1848,13 @@ static void NSString$drawAtPoint$withStyle$(NSString *self, SEL _cmd, CGPoint po
     return [[WBMarkup sharedMarkup] drawString:self atPoint:point withStyle:style];
 }
 
+static void NSString$drawInRect$withStyle$(NSString *self, SEL _cmd, CGRect rect, NSString *style) {
+    WKSetCurrentGraphicsContext(UIGraphicsGetCurrentContext());
+    if (style == nil || [style length] == 0)
+        style = @"font-family: Helvetica; font-size: 12px";
+    return [[WBMarkup sharedMarkup] drawString:self inRect:rect withStyle:style];
+}
+
 static CGSize NSString$sizeWithStyle$forWidth$(NSString *self, SEL _cmd, NSString *style, float width) {
     if (style == nil || [style length] == 0)
         style = @"font-family: Helvetica; font-size: 12px";
@@ -1836,6 +1863,7 @@ static CGSize NSString$sizeWithStyle$forWidth$(NSString *self, SEL _cmd, NSStrin
 
 static void SBInitialize() {
     class_addMethod($NSString, @selector(drawAtPoint:withStyle:), (IMP) &NSString$drawAtPoint$withStyle$, "v20@0:4{CGPoint=ff}8@16");
+    class_addMethod($NSString, @selector(drawInRect:withStyle:), (IMP) &NSString$drawInRect$withStyle$, "v28@0:4{CGRect={CGSize=ff}{CGSize=ff}}8@24");
     class_addMethod($NSString, @selector(sizeWithStyle:forWidth:), (IMP) &NSString$sizeWithStyle$forWidth$, "{CGSize=ff}16@0:4@8f12");
 
     if (SummerBoard_) {
