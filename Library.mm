@@ -698,7 +698,8 @@ MSInstanceMessageHook6(CGSize, NSString, drawAtPoint,forWidth,withFont,lineBreak
         return MSOldCall(point, width, font, mode, spacing, emoji);
 
     NSString *base(state->base_ ?: @"");
-    [self drawAtPoint:point withStyle:[NSString stringWithFormat:@"%@;%@;%@", [font markupDescription], base, info]];
+    NSString *extra([NSString stringWithFormat:@"letter-spacing: %gpx", spacing]);
+    [self drawAtPoint:point withStyle:[NSString stringWithFormat:@"%@;%@;%@;%@", [font markupDescription], extra, base, info]];
     return CGSizeZero;
 }
 
@@ -737,7 +738,8 @@ MSInstanceMessageHook4(CGSize, NSString, sizeWithFont,forWidth,lineBreakMode,let
         return MSOldCall(font, width, mode, spacing);
 
     NSString *base(state->base_ ?: @"");
-    return [self sizeWithStyle:[NSString stringWithFormat:@"%@;%@;%@", [font markupDescription], base, info] forWidth:width];
+    NSString *extra([NSString stringWithFormat:@"letter-spacing: %gpx", spacing]);
+    return [self sizeWithStyle:[NSString stringWithFormat:@"%@;%@;%@;%@", [font markupDescription], extra, base, info] forWidth:width];
 }
 
 MSInstanceMessageHook1(CGSize, NSString, sizeWithFont, UIFont *, font) {
