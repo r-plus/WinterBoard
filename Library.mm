@@ -703,19 +703,19 @@ MSInstanceMessageHook6(CGSize, NSString, drawAtPoint,forWidth,withFont,lineBreak
     return CGSizeZero;
 }
 
-MSInstanceMessageHook6(CGSize, NSString, drawInRect,withFont,lineBreakMode,alignment,lineSpacing,includeEmoji, CGRect, rect, UIFont *, font, int, mode, int, alignment, float, spacing, BOOL, emoji) {
+MSInstanceMessageHook7(CGSize, NSString, _drawInRect,withFont,lineBreakMode,alignment,lineSpacing,includeEmoji,truncationRect, CGRect, rect, UIFont *, font, int, mode, int, alignment, float, spacing, BOOL, emoji, CGRect, truncation) {
     WBStringDrawingState *state(stringDrawingState_);
     if (state == NULL)
-        return MSOldCall(rect, font, mode, alignment, spacing, emoji);
+        return MSOldCall(rect, font, mode, alignment, spacing, emoji, truncation);
 
     if (--state->count_ == 0)
         stringDrawingState_ = state->next_;
     if (state->info_ == nil)
-        return MSOldCall(rect, font, mode, alignment, spacing, emoji);
+        return MSOldCall(rect, font, mode, alignment, spacing, emoji, truncation);
 
     NSString *info([Info_ objectForKey:state->info_]);
     if (info == nil)
-        return MSOldCall(rect, font, mode, alignment, spacing, emoji);
+        return MSOldCall(rect, font, mode, alignment, spacing, emoji, truncation);
 
     NSString *base(state->base_ ?: @"");
     NSString *align(@"text-align: center");
