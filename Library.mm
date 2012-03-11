@@ -676,6 +676,35 @@ MSInstanceMessageHook2(NSString *, NSBundle, pathForResource,ofType, NSString *,
 }
 // }}}
 
+static void $drawLabel$(NSString *label, CGRect rect, NSString *style, NSString *custom) {
+    bool ellipsis(false);
+    float max = rect.size.width - 11, width;
+  width:
+    width = [(ellipsis ? [label stringByAppendingString:@"..."] : label) sizeWithStyle:style forWidth:320].width;
+
+    if (width > max) {
+        size_t length([label length]);
+        float spacing((width - max) / (length - 1));
+
+        if (spacing > 1.25) {
+            ellipsis = true;
+            label = [label substringToIndex:(length - 1)];
+            goto width;
+        }
+
+        style = [style stringByAppendingString:[NSString stringWithFormat:@"letter-spacing: -%f; ", spacing]];
+    }
+
+    if (ellipsis)
+        label = [label stringByAppendingString:@"..."];
+
+    if (custom != nil)
+        style = [style stringByAppendingString:custom];
+
+    CGSize size = [label sizeWithStyle:style forWidth:rect.size.width];
+    [label drawAtPoint:CGPointMake((rect.size.width - size.width) / 2, 0) withStyle:style];
+}
+
 static struct WBStringDrawingState {
     WBStringDrawingState *next_;
     unsigned count_;
@@ -1539,8 +1568,6 @@ MSInstanceMessageHook2(CGSize, WebCoreFrameBridge, renderedSizeOfNode,constraine
 // }}}
 
 MSInstanceMessage1(void, SBIconLabel, drawRect, CGRect, rect) {
-    CGRect bounds = [self bounds];
-
     static Ivar drawMoreLegibly = object_getInstanceVariable(self, "_drawMoreLegibly", NULL);
 
     int docked;
@@ -1563,32 +1590,9 @@ MSInstanceMessage1(void, SBIconLabel, drawRect, CGRect, rect) {
     else if (docked)
         style = [style stringByAppendingString:@"text-shadow: rgba(0, 0, 0, 0.5) 0px -1px 0px; "];
 
-    bool ellipsis(false);
-    float max = [self frame].size.width - 11, width;
-  width:
-    width = [(ellipsis ? [label stringByAppendingString:@"..."] : label) sizeWithStyle:style forWidth:320].width;
+    NSString *custom([Info_ objectForKey:(docked ? @"DockedIconLabelStyle" : @"UndockedIconLabelStyle")]);
 
-    if (width > max) {
-        size_t length([label length]);
-        float spacing((width - max) / (length - 1));
-
-        if (spacing > 1.25) {
-            ellipsis = true;
-            label = [label substringToIndex:(length - 1)];
-            goto width;
-        }
-
-        style = [style stringByAppendingString:[NSString stringWithFormat:@"letter-spacing: -%f; ", spacing]];
-    }
-
-    if (ellipsis)
-        label = [label stringByAppendingString:@"..."];
-
-    if (NSString *custom = [Info_ objectForKey:(docked ? @"DockedIconLabelStyle" : @"UndockedIconLabelStyle")])
-        style = [style stringByAppendingString:custom];
-
-    CGSize size = [label sizeWithStyle:style forWidth:bounds.size.width];
-    [label drawAtPoint:CGPointMake((bounds.size.width - size.width) / 2, 0) withStyle:style];
+    $drawLabel$(label, [self bounds], style, custom);
 }
 
 MSInstanceMessage0(CGImageRef, SBIconLabel, buildLabelImage) {
