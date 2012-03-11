@@ -683,7 +683,7 @@ static struct WBStringDrawingState {
     NSString *info_;
 } *stringDrawingState_;
 
-MSInstanceMessageHook6(CGSize, NSString, drawAtPoint,forWidth,withFont,lineBreakMode,letterSpacing,includeEmoji, CGPoint, point, float, width, UIFont *, font, int, mode, float, spacing, BOOL, emoji) {
+MSInstanceMessageHook6(CGSize, NSString, drawAtPoint,forWidth,withFont,lineBreakMode,letterSpacing,includeEmoji, CGPoint, point, float, width, UIFont *, font, UILineBreakMode, mode, float, spacing, BOOL, emoji) {
     WBStringDrawingState *state(stringDrawingState_);
     if (state == NULL)
         return MSOldCall(point, width, font, mode, spacing, emoji);
@@ -703,7 +703,7 @@ MSInstanceMessageHook6(CGSize, NSString, drawAtPoint,forWidth,withFont,lineBreak
     return CGSizeZero;
 }
 
-MSInstanceMessageHook7(CGSize, NSString, _drawInRect,withFont,lineBreakMode,alignment,lineSpacing,includeEmoji,truncationRect, CGRect, rect, UIFont *, font, int, mode, int, alignment, float, spacing, BOOL, emoji, CGRect, truncation) {
+MSInstanceMessageHook7(CGSize, NSString, _drawInRect,withFont,lineBreakMode,alignment,lineSpacing,includeEmoji,truncationRect, CGRect, rect, UIFont *, font, UILineBreakMode, mode, WebTextAlignment, alignment, float, spacing, BOOL, emoji, CGRect, truncation) {
     WBStringDrawingState *state(stringDrawingState_);
     if (state == NULL)
         return MSOldCall(rect, font, mode, alignment, spacing, emoji, truncation);
@@ -737,7 +737,7 @@ MSInstanceMessageHook7(CGSize, NSString, _drawInRect,withFont,lineBreakMode,alig
     return CGSizeZero;
 }
 
-MSInstanceMessageHook4(CGSize, NSString, sizeWithFont,forWidth,lineBreakMode,letterSpacing, UIFont *, font, float, width, int, mode, float, spacing) {
+MSInstanceMessageHook4(CGSize, NSString, sizeWithFont,forWidth,lineBreakMode,letterSpacing, UIFont *, font, float, width, UILineBreakMode, mode, float, spacing) {
     WBStringDrawingState *state(stringDrawingState_);
     if (state == NULL)
         return MSOldCall(font, width, mode, spacing);
@@ -1208,7 +1208,7 @@ extern "C" NSString *UIStyleStringFromColor(CGColorRef);*/
 
 WBDelegate(time_)
 
-- (CGSize) drawAtPoint:(CGPoint)point forWidth:(float)width withFont:(UIFont *)font lineBreakMode:(int)mode {
+- (CGSize) drawAtPoint:(CGPoint)point forWidth:(float)width withFont:(UIFont *)font lineBreakMode:(UILineBreakMode)mode {
     if (NSString *custom = [Info_ objectForKey:@"TimeStyle"]) {
         BOOL &_mode(MSHookIvar<BOOL>(view_, "_mode"));;
 
@@ -1255,7 +1255,7 @@ WBDelegate(time_)
 
 WBDelegate(badge_)
 
-- (CGSize) drawAtPoint:(CGPoint)point forWidth:(float)width withFont:(UIFont *)font lineBreakMode:(int)mode {
+- (CGSize) drawAtPoint:(CGPoint)point forWidth:(float)width withFont:(UIFont *)font lineBreakMode:(UILineBreakMode)mode {
     if (NSString *custom = [Info_ objectForKey:@"BadgeStyle"]) {
         [badge_ drawAtPoint:point withStyle:[NSString stringWithFormat:@""
             "font-family: Helvetica; "
