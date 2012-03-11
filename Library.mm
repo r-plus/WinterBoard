@@ -713,6 +713,8 @@ static struct WBStringDrawingState {
 } *stringDrawingState_;
 
 MSInstanceMessageHook6(CGSize, NSString, drawAtPoint,forWidth,withFont,lineBreakMode,letterSpacing,includeEmoji, CGPoint, point, float, width, UIFont *, font, UILineBreakMode, mode, float, spacing, BOOL, emoji) {
+    //NSLog(@"XXX: @\"%@\" %g", self, spacing);
+
     WBStringDrawingState *state(stringDrawingState_);
     if (state == NULL)
         return MSOldCall(point, width, font, mode, spacing, emoji);
@@ -732,7 +734,11 @@ MSInstanceMessageHook6(CGSize, NSString, drawAtPoint,forWidth,withFont,lineBreak
     return CGSizeZero;
 }
 
+extern "C" NSString *NSStringFromCGRect(CGRect rect);
+
 MSInstanceMessageHook7(CGSize, NSString, _drawInRect,withFont,lineBreakMode,alignment,lineSpacing,includeEmoji,truncationRect, CGRect, rect, UIFont *, font, UILineBreakMode, mode, UITextAlignment, alignment, float, spacing, BOOL, emoji, CGRect, truncation) {
+    //NSLog(@"XXX: &\"%@\" %@ \"%@\" %u %u %g %u %@", self, NSStringFromCGRect(rect), font, mode, alignment, spacing, emoji, NSStringFromCGRect(truncation));
+
     WBStringDrawingState *state(stringDrawingState_);
     if (state == NULL)
         return MSOldCall(rect, font, mode, alignment, spacing, emoji, truncation);
@@ -772,6 +778,8 @@ MSInstanceMessageHook7(CGSize, NSString, _drawInRect,withFont,lineBreakMode,alig
 }
 
 MSInstanceMessageHook4(CGSize, NSString, sizeWithFont,forWidth,lineBreakMode,letterSpacing, UIFont *, font, float, width, UILineBreakMode, mode, float, spacing) {
+    //NSLog(@"XXX: #\"%@\" \"%@\" %g %u %g", self, font, width, mode, spacing);
+
     WBStringDrawingState *state(stringDrawingState_);
     if (state == NULL)
         return MSOldCall(font, width, mode, spacing);
@@ -791,6 +799,8 @@ MSInstanceMessageHook4(CGSize, NSString, sizeWithFont,forWidth,lineBreakMode,let
 }
 
 MSInstanceMessageHook1(CGSize, NSString, sizeWithFont, UIFont *, font) {
+    //NSLog(@"XXX: ?\"%@\"", self);
+
     WBStringDrawingState *state(stringDrawingState_);
     if (state == NULL)
         return MSOldCall(font);
@@ -1611,7 +1621,9 @@ MSInstanceMessage0(CGImageRef, SBIconLabel, buildLabelImage) {
 
     stringDrawingState_ = &labelState;
 
+    //NSLog(@"XXX: +");
     CGImageRef image(MSOldCall());
+    //NSLog(@"XXX: -");
 
     stringDrawingState_ = NULL;
     return image;
@@ -1870,6 +1882,7 @@ static void NSString$drawAtPoint$withStyle$(NSString *self, SEL _cmd, CGPoint po
     WKSetCurrentGraphicsContext(UIGraphicsGetCurrentContext());
     if (style == nil || [style length] == 0)
         style = @"font-family: Helvetica; font-size: 12px";
+    //NSLog(@"XXX:draw(%@)", [style stringByReplacingOccurrencesOfString:@"\n" withString:@" "]);
     return [[WBMarkup sharedMarkup] drawString:self atPoint:point withStyle:style];
 }
 
@@ -1883,6 +1896,7 @@ static void NSString$drawInRect$withStyle$(NSString *self, SEL _cmd, CGRect rect
 static CGSize NSString$sizeWithStyle$forWidth$(NSString *self, SEL _cmd, NSString *style, float width) {
     if (style == nil || [style length] == 0)
         style = @"font-family: Helvetica; font-size: 12px";
+    //NSLog(@"XXX:size(%@)", [style stringByReplacingOccurrencesOfString:@"\n" withString:@" "]);
     return [[WBMarkup sharedMarkup] sizeOfString:self withStyle:style forWidth:width];
 }
 
