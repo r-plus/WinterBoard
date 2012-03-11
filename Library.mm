@@ -718,8 +718,8 @@ MSInstanceMessageHook7(CGSize, NSString, _drawInRect,withFont,lineBreakMode,alig
         return MSOldCall(rect, font, mode, alignment, spacing, emoji, truncation);
 
     NSString *base(state->base_ ?: @"");
-    NSString *align(@"text-align: center");
-    [self drawInRect:rect withStyle:[NSString stringWithFormat:@"%@;%@;%@;%@", [font markupDescription], align, base, info]];
+    NSString *extra(@"text-align: center");
+    [self drawInRect:rect withStyle:[NSString stringWithFormat:@"%@;%@;%@;%@", [font markupDescription], extra, base, info]];
     return CGSizeZero;
 }
 
