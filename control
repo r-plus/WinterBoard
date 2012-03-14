@@ -7,6 +7,7 @@ Version: VERSION
 Description: more powerful, open-source SummerBoard
 Name: WinterBoard
 Depends: mobilesubstrate (>= 0.9.3225-1), killall, preferenceloader, libhide (>= 2.0.4), findutils, net.howett.pincrush (>= 0.0.1-23) | pincrush
+Breaks: jp.ashikase.folderenhancer (<< 1.6.0.2-1)
 Provides: theme-manager
 Conflicts: com.modmyifone.winterboardicon, winterboardsettings, themesettings, com.iphonerepocenter.transparentdockfor3xtheme
 Replaces: com.modmyifone.winterboardicon, winterboardsettings, themesettings, com.iphonerepocenter.transparentdockfor3xtheme
