@@ -1811,7 +1811,7 @@ MSHook(bool, _Z24GetFileNameForThisActionmPcRb, unsigned long a0, char *a1, bool
                 NSString *path([NSString stringWithFormat:@"%@/UISounds/%@", theme, file]);
                 if ([Manager_ fileExistsAtPath:path]) {
                     strcpy(a1, [path UTF8String]);
-                    continue;
+                    break;
                 }
             }
         }
