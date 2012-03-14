@@ -160,15 +160,14 @@ MSClassHook(SBWidgetApplicationIcon)
 
 extern "C" void WKSetCurrentGraphicsContext(CGContextRef);
 
-__attribute__((__constructor__))
-static void MSFixClass() {
-    if ($SBIcon == nil)
-        $SBIcon = objc_getClass("SBIconView");
+static struct MSFixClass { MSFixClass() {
+    $SBIcon = objc_getClass("SBIconView") ?: $SBIcon;
+
     if ($SBIconList == nil)
         $SBIconList = objc_getClass("SBIconListView");
     if ($CKTranscriptController == nil)
         $CKTranscriptController = objc_getClass("mSMSMessageTranscriptController");
-}
+} } MSFixClass;
 
 static bool IsWild_;
 static bool Four_($SBDockIconListView != nil);
