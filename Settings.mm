@@ -460,8 +460,8 @@ static NSString *_plist;
 
         _settings = [_settings retain];
 
-        if (set && [_settings objectForKey:@"SummerBoard"] == nil)
-            [_settings setObject:[NSNumber numberWithBool:YES] forKey:@"SummerBoard"];
+        if ([_settings objectForKey:@"SummerBoard"] == nil)
+            [_settings setObject:[NSNumber numberWithBool:set] forKey:@"SummerBoard"];
 
         [_settings setObject:[NSNumber numberWithBool:IsIconHiddenDisplayId(WinterBoardDisplayID)] forKey:@"IconHidden"];
     } return self;
