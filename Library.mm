@@ -141,6 +141,7 @@ MSClassHook(SBDockIconListView)
 MSClassHook(SBIcon)
 MSClassHook(SBIconBadge)
 MSClassHook(SBIconBadgeFactory)
+MSClassHook(SBIconContentView)
 MSClassHook(SBIconController)
 MSClassHook(SBIconLabel)
 MSClassHook(SBIconList)
@@ -163,6 +164,8 @@ __attribute__((__constructor__))
 static void MSFixClass() {
     if ($SBIcon == nil)
         $SBIcon = objc_getClass("SBIconView");
+    if ($SBIconList == nil)
+        $SBIconList = objc_getClass("SBIconListView");
     if ($CKTranscriptController == nil)
         $CKTranscriptController = objc_getClass("mSMSMessageTranscriptController");
 }
@@ -1474,31 +1477,53 @@ MSHook(void, SBIconList$setFrame$, SBIconList *self, SEL sel, CGRect frame) {
     _SBIconList$setFrame$(self, sel, frame);
 }
 
+static void $addPerPageView$(unsigned i, UIView *list) {
+    NSString *path($getTheme$([NSArray arrayWithObject:[NSString stringWithFormat:@"Page%u.png", i]]));
+    if (path == nil)
+        return;
+
+    NSArray *subviews([list subviews]);
+
+    WBImageView *view([subviews count] == 0 ? nil : [subviews objectAtIndex:0]);
+    if (view == nil || ![view wb$isWBImageView]) {
+        view = [[[WBImageView alloc] init] autorelease];
+        [list insertSubview:view atIndex:0];
+    }
+
+    UIImage *image([UIImage imageWithContentsOfFile:path]);
+
+    CGRect frame([view frame]);
+    frame.size = [image size];
+    [view setFrame:frame];
+
+    [view setImage:image];
+    [view wb$updateFrame];
+}
+
+static void $addPerPageViews$(NSArray *lists) {
+    for (unsigned i(0), e([lists count]); i != e; ++i)
+        $addPerPageView$(i, [lists objectAtIndex:i]);
+}
+
+MSInstanceMessageHook0(void, SBIconController, updateNumberOfRootIconLists) {
+    NSArray *&_rootIconLists(MSHookIvar<NSArray *>(self, "_rootIconLists"));
+    $addPerPageViews$(_rootIconLists);
+    return MSOldCall();
+}
+
+MSInstanceMessageHook0(void, SBIconContentView, layoutSubviews) {
+    MSOldCall();
+
+    if (SBIconController *controller = [$SBIconController sharedInstance]) {
+        UIView *&_dockContainerView(MSHookIvar<UIView *>(controller, "_dockContainerView"));
+        if (&_dockContainerView != NULL)
+            [[_dockContainerView superview] bringSubviewToFront:_dockContainerView];
+    }
+}
+
 MSHook(void, SBIconController$noteNumberOfIconListsChanged, SBIconController *self, SEL sel) {
     SBIconModel *&_iconModel(MSHookIvar<SBIconModel *>(self, "_iconModel"));
-    NSArray *lists([_iconModel iconLists]);
-
-    for (unsigned i(0), e([lists count]); i != e; ++i)
-        if (NSString *path = $getTheme$([NSArray arrayWithObject:[NSString stringWithFormat:@"Page%u.png", i]])) {
-            SBIconList *list([lists objectAtIndex:i]);
-            NSArray *subviews([list subviews]);
-
-            WBImageView *view([subviews count] == 0 ? nil : [subviews objectAtIndex:0]);
-            if (view == nil || ![view wb$isWBImageView]) {
-                view = [[[WBImageView alloc] init] autorelease];
-                [list insertSubview:view atIndex:0];
-            }
-
-            UIImage *image([UIImage imageWithContentsOfFile:path]);
-
-            CGRect frame([view frame]);
-            frame.size = [image size];
-            [view setFrame:frame];
-
-            [view setImage:image];
-            [view wb$updateFrame];
-        }
-
+    $addPerPageViews$([_iconModel iconLists]);
     return _SBIconController$noteNumberOfIconListsChanged(self, sel);
 }
 
