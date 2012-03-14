@@ -445,25 +445,29 @@ static NSString *_plist;
     UnHideIconViaDisplayId = reinterpret_cast<BOOL (*)(NSString *)>(dlsym(libhide, "UnHideIconViaDisplayId"));
 }
 
+- (void) _wb$loadSettings {
+    _plist = [[NSString stringWithFormat:@"%@/Library/Preferences/com.saurik.WinterBoard.plist", NSHomeDirectory()] retain];
+    _settings = [NSMutableDictionary dictionaryWithContentsOfFile:_plist];
+
+    bool set;
+    if (_settings != nil)
+        set = true;
+    else {
+        set = false;
+        _settings = [NSMutableDictionary dictionary];
+    }
+
+    _settings = [_settings retain];
+
+    if ([_settings objectForKey:@"SummerBoard"] == nil)
+        [_settings setObject:[NSNumber numberWithBool:set] forKey:@"SummerBoard"];
+
+    [_settings setObject:[NSNumber numberWithBool:IsIconHiddenDisplayId(WinterBoardDisplayID)] forKey:@"IconHidden"];
+}
+
 - (id) initForContentSize:(CGSize)size {
     if ((self = [super initForContentSize:size]) != nil) {
-        _plist = [[NSString stringWithFormat:@"%@/Library/Preferences/com.saurik.WinterBoard.plist", NSHomeDirectory()] retain];
-        _settings = [NSMutableDictionary dictionaryWithContentsOfFile:_plist];
-
-        bool set;
-        if (_settings != nil)
-            set = true;
-        else {
-            set = false;
-            _settings = [NSMutableDictionary dictionary];
-        }
-
-        _settings = [_settings retain];
-
-        if ([_settings objectForKey:@"SummerBoard"] == nil)
-            [_settings setObject:[NSNumber numberWithBool:set] forKey:@"SummerBoard"];
-
-        [_settings setObject:[NSNumber numberWithBool:IsIconHiddenDisplayId(WinterBoardDisplayID)] forKey:@"IconHidden"];
+        [self _wb$loadSettings];
     } return self;
 }
 
@@ -510,10 +514,9 @@ static NSString *_plist;
 - (void) cancelChanges {
     [_settings release];
     [_plist release];
-    _plist = [[NSString stringWithFormat:@"%@/Library/Preferences/com.saurik.WinterBoard.plist", NSHomeDirectory()] retain];
-    _settings = [([NSMutableDictionary dictionaryWithContentsOfFile:_plist] ?: [NSMutableDictionary dictionary]) retain];
 
-    [_settings setObject:[NSNumber numberWithBool:IsIconHiddenDisplayId(WinterBoardDisplayID)] forKey:@"IconHidden"];
+    [self _wb$loadSettings];
+
     [self reloadSpecifiers];
     if (![[PSViewController class] instancesRespondToSelector:@selector(showLeftButton:withStyle:rightButton:withStyle:)]) {
         [[self navigationItem] setLeftBarButtonItem:nil];
