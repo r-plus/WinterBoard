@@ -1337,8 +1337,12 @@ MSInstanceMessageHook0(id, SBIcon, initWithDefaultSize) {
         if (NSNumber *number = [Info_ objectForKey:@"IconAlpha"]) {
             // XXX: note: this is overridden above, which is silly
             float alpha([number floatValue]);
-            [self setIconImageAlpha:alpha];
-            [self setIconLabelAlpha:alpha];
+            if ([self respondsToSelector:@selector(setIconImageAlpha:)])
+                [self setIconImageAlpha:alpha];
+            if ([self respondsToSelector:@selector(setIconLabelAlpha:)])
+                [self setIconLabelAlpha:alpha];
+            if ([self respondsToSelector:@selector(setAlpha:)])
+                [self setAlpha:alpha];
         }
     } return self;
 }
