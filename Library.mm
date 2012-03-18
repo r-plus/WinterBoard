@@ -121,6 +121,7 @@ MSClassHook(UIImage)
 MSMetaClassHook(UIImage)
 MSClassHook(UINavigationBar)
 MSClassHook(UIToolbar)
+MSClassHook(UIStatusBarTimeItemView)
 
 MSClassHook(CKBalloonView)
 MSClassHook(CKMessageCell)
@@ -849,6 +850,19 @@ MSInstanceMessageHook1(UIImage *, SBCalendarApplicationIcon, generateIconImage, 
     stringDrawingState_ = &dateState;
 
     UIImage *image(MSOldCall(type));
+
+    stringDrawingState_ = NULL;
+    return image;
+}
+
+MSInstanceMessageHook1(UIImage *, UIStatusBarTimeItemView, contentsImageForStyle, int, style) {
+    WBStringDrawingState timeState = {NULL, 0, @""
+        "color: white;"
+    , @"TimeStyle"};
+
+    stringDrawingState_ = &timeState;
+
+    UIImage *image(MSOldCall(style));
 
     stringDrawingState_ = NULL;
     return image;
