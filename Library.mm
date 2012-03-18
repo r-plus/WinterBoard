@@ -1941,10 +1941,6 @@ static CGSize NSString$sizeWithStyle$forWidth$(NSString *self, SEL _cmd, NSStrin
 }
 
 static void SBInitialize() {
-    class_addMethod($NSString, @selector(drawAtPoint:withStyle:), (IMP) &NSString$drawAtPoint$withStyle$, "v20@0:4{CGPoint=ff}8@16");
-    class_addMethod($NSString, @selector(drawInRect:withStyle:), (IMP) &NSString$drawInRect$withStyle$, "v28@0:4{CGRect={CGSize=ff}{CGSize=ff}}8@24");
-    class_addMethod($NSString, @selector(sizeWithStyle:forWidth:), (IMP) &NSString$sizeWithStyle$forWidth$, "{CGSize=ff}16@0:4@8f12");
-
     if (SummerBoard_) {
         WBRename(SBApplication, pathForIcon, pathForIcon);
         WBRename(SBApplicationIcon, icon, icon);
@@ -2109,6 +2105,10 @@ MSInitialize {
     // }}}
     // UIKit {{{
     if ([NSBundle bundleWithIdentifier:@"com.apple.UIKit"] != nil) {
+        class_addMethod($NSString, @selector(drawAtPoint:withStyle:), (IMP) &NSString$drawAtPoint$withStyle$, "v20@0:4{CGPoint=ff}8@16");
+        class_addMethod($NSString, @selector(drawInRect:withStyle:), (IMP) &NSString$drawInRect$withStyle$, "v28@0:4{CGRect={CGSize=ff}{CGSize=ff}}8@24");
+        class_addMethod($NSString, @selector(sizeWithStyle:forWidth:), (IMP) &NSString$sizeWithStyle$forWidth$, "{CGSize=ff}16@0:4@8f12");
+
         struct nlist nl[6];
         memset(nl, 0, sizeof(nl));
         nl[0].n_un.n_name = (char *) "__UIApplicationImageWithName";
