@@ -715,6 +715,52 @@ static struct WBStringDrawingState {
     NSString *info_;
 } *stringDrawingState_;
 
+extern "C" CGColorSpaceRef CGContextGetFillColorSpace(CGContextRef);
+extern "C" void CGContextGetFillColor(CGContextRef, CGFloat[]);
+
+static NSString *WBColorMarkup() {
+    CGContextRef context(UIGraphicsGetCurrentContext());
+    //NSLog(@"XXX:1:%p", context);
+    if (context == NULL)
+        return @"";
+
+    CGColorSpaceRef space(CGContextGetFillColorSpace(context));
+    //NSLog(@"XXX:2:%p", space);
+    if (space == NULL)
+        return @"";
+
+    size_t number(CGColorSpaceGetNumberOfComponents(space));
+    //NSLog(@"XXX:3:%u", number);
+    if (number == 0)
+        return @"";
+
+    CGFloat components[number + 1];
+    CGContextGetFillColor(context, components);
+
+    CGFloat r, g, b, a;
+
+    switch (number) {
+        case 1:
+            r = components[0];
+            g = components[0];
+            b = components[0];
+            a = components[1];
+        break;
+
+        case 3:
+            r = components[0];
+            g = components[1];
+            b = components[2];
+            a = components[3];
+        break;
+
+        default:
+            return @"";
+    }
+
+    return [NSString stringWithFormat:@"color: rgba(%g, %g, %g, %g)", r * 255, g * 255, b * 255, a];
+}
+
 MSInstanceMessageHook6(CGSize, NSString, drawAtPoint,forWidth,withFont,lineBreakMode,letterSpacing,includeEmoji, CGPoint, point, float, width, UIFont *, font, UILineBreakMode, mode, float, spacing, BOOL, emoji) {
     //NSLog(@"XXX: @\"%@\" %g", self, spacing);
 
@@ -733,7 +779,7 @@ MSInstanceMessageHook6(CGSize, NSString, drawAtPoint,forWidth,withFont,lineBreak
 
     NSString *base(state->base_ ?: @"");
     NSString *extra([NSString stringWithFormat:@"letter-spacing: %gpx", spacing]);
-    [self drawAtPoint:point withStyle:[NSString stringWithFormat:@"%@;%@;%@;%@", [font markupDescription], extra, base, info]];
+    [self drawAtPoint:point withStyle:[NSString stringWithFormat:@"%@;%@;%@;%@;%@", [font markupDescription], WBColorMarkup(), extra, base, info]];
     return CGSizeZero;
 }
 
@@ -773,9 +819,9 @@ MSInstanceMessageHook7(CGSize, NSString, _drawInRect,withFont,lineBreakMode,alig
     NSString *extra([NSString stringWithFormat:@"text-align: %@", textAlign]);
 
     if (true)
-        $drawLabel$(self, rect, [NSString stringWithFormat:@"%@;%@", [font markupDescription], base], info);
+        $drawLabel$(self, rect, [NSString stringWithFormat:@"%@;%@;%@", [font markupDescription], WBColorMarkup(), base], info);
     else
-        [self drawInRect:rect withStyle:[NSString stringWithFormat:@"%@;%@;%@;%@", [font markupDescription], extra, base, info]];
+        [self drawInRect:rect withStyle:[NSString stringWithFormat:@"%@;%@;%@;%@;%@", [font markupDescription], WBColorMarkup(), extra, base, info]];
 
     return CGSizeZero;
 }
@@ -798,7 +844,7 @@ MSInstanceMessageHook4(CGSize, NSString, sizeWithFont,forWidth,lineBreakMode,let
 
     NSString *base(state->base_ ?: @"");
     NSString *extra([NSString stringWithFormat:@"letter-spacing: %gpx", spacing]);
-    return [self sizeWithStyle:[NSString stringWithFormat:@"%@;%@;%@;%@", [font markupDescription], extra, base, info] forWidth:width];
+    return [self sizeWithStyle:[NSString stringWithFormat:@"%@;%@;%@;%@;%@", [font markupDescription], WBColorMarkup(), extra, base, info] forWidth:width];
 }
 
 MSInstanceMessageHook1(CGSize, NSString, sizeWithFont, UIFont *, font) {
@@ -818,12 +864,11 @@ MSInstanceMessageHook1(CGSize, NSString, sizeWithFont, UIFont *, font) {
         return MSOldCall(font);
 
     NSString *base(state->base_ ?: @"");
-    return [self sizeWithStyle:[NSString stringWithFormat:@"%@;%@;%@", [font markupDescription], base, info] forWidth:65535];
+    return [self sizeWithStyle:[NSString stringWithFormat:@"%@;%@;%@;%@", [font markupDescription], WBColorMarkup(), base, info] forWidth:65535];
 }
 
 MSInstanceMessageHook1(UIImage *, SBIconBadgeFactory, checkoutBadgeImageForText, NSString *, text) {
     WBStringDrawingState badgeState = {NULL, 1, @""
-        "color: white;"
     , @"BadgeStyle"};
 
     stringDrawingState_ = &badgeState;
@@ -836,7 +881,6 @@ MSInstanceMessageHook1(UIImage *, SBIconBadgeFactory, checkoutBadgeImageForText,
 
 MSInstanceMessageHook1(UIImage *, SBCalendarApplicationIcon, generateIconImage, int, type) {
     WBStringDrawingState dayState = {NULL, 2, @""
-        "color: white;"
         // XXX: this is only correct on an iPod dock
         "text-shadow: rgba(0, 0, 0, 0.2) -1px -1px 2px;"
     , @"CalendarIconDayStyle"};
@@ -844,7 +888,6 @@ MSInstanceMessageHook1(UIImage *, SBCalendarApplicationIcon, generateIconImage, 
     WBStringDrawingState sizeState = {&dayState, 7, nil, nil};
 
     WBStringDrawingState dateState = {&sizeState, 2, @""
-        "color: #333333;"
     , @"CalendarIconDateStyle"};
 
     stringDrawingState_ = &dateState;
@@ -857,7 +900,6 @@ MSInstanceMessageHook1(UIImage *, SBCalendarApplicationIcon, generateIconImage, 
 
 MSInstanceMessageHook1(UIImage *, UIStatusBarTimeItemView, contentsImageForStyle, int, style) {
     WBStringDrawingState timeState = {NULL, 0, @""
-        "color: white;"
     , @"TimeStyle"};
 
     stringDrawingState_ = &timeState;
@@ -1656,7 +1698,6 @@ MSInstanceMessage0(CGImageRef, SBIconLabel, buildLabelImage) {
     bool docked((MSHookIvar<unsigned>(self, "_inDock") & 0x2) != 0);
 
     WBStringDrawingState labelState = {NULL, 0, @""
-        "color: white;"
     , docked ? @"DockedIconLabelStyle" : @"UndockedIconLabelStyle"};
 
     stringDrawingState_ = &labelState;
