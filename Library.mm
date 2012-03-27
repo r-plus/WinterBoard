@@ -122,6 +122,7 @@ MSMetaClassHook(UIImage)
 MSClassHook(UINavigationBar)
 MSClassHook(UIToolbar)
 MSClassHook(UIStatusBarTimeItemView)
+MSClassHook(UIWebDocumentView)
 
 MSClassHook(CKBalloonView)
 MSClassHook(CKMessageCell)
@@ -162,6 +163,7 @@ MSClassHook(SBWidgetApplicationIcon)
 extern "C" void WKSetCurrentGraphicsContext(CGContextRef);
 
 static struct MSFixClass { MSFixClass() {
+    $UIWebDocumentView = objc_getClass("UIWebBrowserView") ?: $UIWebDocumentView;
     $SBIcon = objc_getClass("SBIconView") ?: $SBIcon;
 
     if ($SBIconList == nil)
@@ -1202,7 +1204,7 @@ MSInstanceMessageHook0(id, SBUIController, init) {
         if (NSString *path = $getTheme$([NSArray arrayWithObject:@"Wallpaper.html"], themes)) {
             CGRect bounds = [indirect bounds];
 
-            UIWebDocumentView *view([[[UIWebDocumentView alloc] initWithFrame:bounds] autorelease]);
+            UIWebDocumentView *view([[[$UIWebDocumentView alloc] initWithFrame:bounds] autorelease]);
             [view setAutoresizes:true];
 
             WallpaperPage_ = [view retain];
@@ -1225,7 +1227,7 @@ MSInstanceMessageHook0(id, SBUIController, init) {
         if ([Manager_ fileExistsAtPath:html]) {
             CGRect bounds = [indirect bounds];
 
-            UIWebDocumentView *view([[[UIWebDocumentView alloc] initWithFrame:bounds] autorelease]);
+            UIWebDocumentView *view([[[$UIWebDocumentView alloc] initWithFrame:bounds] autorelease]);
             [view setAutoresizes:true];
 
             NSURL *url = [NSURL fileURLWithPath:html];
@@ -1256,7 +1258,7 @@ MSHook(void, SBAwayView$updateDesktopImage$, SBAwayView *self, SEL sel, UIImage 
     if (path != nil) {
         CGRect bounds = [self bounds];
 
-        UIWebDocumentView *view([[[UIWebDocumentView alloc] initWithFrame:bounds] autorelease]);
+        UIWebDocumentView *view([[[$UIWebDocumentView alloc] initWithFrame:bounds] autorelease]);
         [view setAutoresizes:true];
 
         if (WallpaperPage_ != nil)
