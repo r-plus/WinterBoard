@@ -1965,7 +1965,7 @@ static void NSString$drawAtPoint$withStyle$(NSString *self, SEL _cmd, CGPoint po
     WKSetCurrentGraphicsContext(UIGraphicsGetCurrentContext());
     if (style == nil || [style length] == 0)
         style = @"font-family: Helvetica; font-size: 12px";
-    //NSLog(@"XXX:draw(%@)", [style stringByReplacingOccurrencesOfString:@"\n" withString:@" "]);
+    //NSLog(@"XXX:drawP(%@)", [style stringByReplacingOccurrencesOfString:@"\n" withString:@" "]);
     return [[WBMarkup sharedMarkup] drawString:self atPoint:point withStyle:style];
 }
 
@@ -1973,6 +1973,7 @@ static void NSString$drawInRect$withStyle$(NSString *self, SEL _cmd, CGRect rect
     WKSetCurrentGraphicsContext(UIGraphicsGetCurrentContext());
     if (style == nil || [style length] == 0)
         style = @"font-family: Helvetica; font-size: 12px";
+    //NSLog(@"XXX:drawR(%@)", [style stringByReplacingOccurrencesOfString:@"\n" withString:@" "]);
     return [[WBMarkup sharedMarkup] drawString:self inRect:rect withStyle:style];
 }
 
