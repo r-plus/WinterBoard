@@ -870,7 +870,7 @@ MSInstanceMessageHook1(CGSize, NSString, sizeWithFont, UIFont *, font) {
 }
 
 MSInstanceMessageHook1(UIImage *, SBIconBadgeFactory, checkoutBadgeImageForText, NSString *, text) {
-    WBStringDrawingState badgeState = {NULL, 1, @""
+    WBStringDrawingState badgeState = {NULL, -1, @""
     , @"BadgeStyle"};
 
     stringDrawingState_ = &badgeState;
